@@ -310,6 +310,11 @@ export default function TaskPage({ params }: TaskPageProps) {
                       currentUser &&
                       (currentUser.role === "Admin" ||
                         entry.user.id === currentUser.id);
+                    
+                    // Find subtask if entry is linked to one
+                    const subtask = entry.subtaskId
+                      ? task.subtasks.find((s) => s.id === entry.subtaskId)
+                      : null;
 
                     return (
                       <div
@@ -333,6 +338,14 @@ export default function TaskPage({ params }: TaskPageProps) {
                               {entry.date}
                             </span>
                           </div>
+                          {subtask && (
+                            <div className="ml-8 mb-1">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
+                                <span className="font-semibold">Subtask:</span>
+                                {subtask.title}
+                              </span>
+                            </div>
+                          )}
                           <div className="flex items-center gap-3 ml-8">
                             <span className="text-sm font-semibold text-indigo-600">
                               {hours > 0 && `${hours}h `}
