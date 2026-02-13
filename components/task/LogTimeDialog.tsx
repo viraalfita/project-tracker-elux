@@ -107,7 +107,8 @@ export function LogTimeDialog({ taskId, onClose }: LogTimeDialogProps) {
                 htmlFor="subtask"
                 className="block text-sm font-medium text-foreground mb-1"
               >
-                Subtask <span className="text-muted-foreground">(optional)</span>
+                Subtask{" "}
+                <span className="text-muted-foreground">(optional)</span>
               </label>
               <select
                 id="subtask"

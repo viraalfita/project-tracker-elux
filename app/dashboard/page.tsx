@@ -7,6 +7,7 @@ import { EPICS, getEpicProgress, USERS } from "@/lib/mock";
 import {
   calculateUtilization,
   calculateUtilizationAggregates,
+  downloadKpiCsv,
 } from "@/lib/utils";
 import {
   AlertCircle,
@@ -14,6 +15,7 @@ import {
   BarChart2,
   CheckCircle2,
   Clock,
+  Download,
   Filter,
   LayoutDashboard,
   TrendingUp,
@@ -121,21 +123,32 @@ export default function DashboardPage() {
                 <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
                   Key Metrics
                 </h2>
-                {/* Epic filter for KPI */}
-                <div className="flex items-center gap-2">
-                  <Filter className="h-3.5 w-3.5 text-muted-foreground" />
-                  <select
-                    value={kpiEpicFilter}
-                    onChange={(e) => setKpiEpicFilter(e.target.value)}
-                    className="rounded border border-border bg-white px-2.5 py-1 text-xs text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                <div className="flex items-center gap-3">
+                  {/* Epic filter for KPI */}
+                  <div className="flex items-center gap-2">
+                    <Filter className="h-3.5 w-3.5 text-muted-foreground" />
+                    <select
+                      value={kpiEpicFilter}
+                      onChange={(e) => setKpiEpicFilter(e.target.value)}
+                      className="rounded border border-border bg-white px-2.5 py-1 text-xs text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      <option value="">All Epics</option>
+                      {EPICS.map((e) => (
+                        <option key={e.id} value={e.id}>
+                          {e.title}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  {/* Export KPI CSV button */}
+                  <button
+                    onClick={() => downloadKpiCsv(kpiTasks, EPICS)}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 transition-colors"
                   >
-                    <option value="">All Epics</option>
-                    {EPICS.map((e) => (
-                      <option key={e.id} value={e.id}>
-                        {e.title}
-                      </option>
-                    ))}
-                  </select>
+                    <Download className="h-3.5 w-3.5" />
+                    Export KPI CSV
+                  </button>
                 </div>
               </div>
               <div className="grid grid-cols-4 gap-4">

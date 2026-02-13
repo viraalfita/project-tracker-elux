@@ -172,9 +172,7 @@ export function getAssignableUsers(
 export function canMoveFromReview(user: User | null): boolean {
   if (!user) return false;
   return (
-    user.role === "Admin" ||
-    user.role === "Manager" ||
-    user.role === "Member"
+    user.role === "Admin" || user.role === "Manager" || user.role === "Member"
   );
 }
 
@@ -184,5 +182,7 @@ export function canMoveFromReview(user: User | null): boolean {
  */
 export function canWrite(user: User | null): boolean {
   if (!user) return false;
-  return user.role === "Admin" || user.role === "Manager" || user.role === "Member";
+  return (
+    user.role === "Admin" || user.role === "Manager" || user.role === "Member"
+  );
 }

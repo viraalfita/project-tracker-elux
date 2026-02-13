@@ -39,7 +39,7 @@ export default function WorkspacePage() {
               Workspace Members
             </h1>
           </div>
-          
+
           {/* Admin Actions */}
           {isAdmin && (
             <div className="flex gap-2">
@@ -107,7 +107,9 @@ export default function WorkspacePage() {
 
       {/* Access Management Dialog */}
       {showAccessManagement && (
-        <AccessManagementDialog onClose={() => setShowAccessManagement(false)} />
+        <AccessManagementDialog
+          onClose={() => setShowAccessManagement(false)}
+        />
       )}
     </div>
   );
@@ -208,7 +210,9 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
               className="w-full px-3 py-2 rounded-md border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
               <option value="Member">Member - Can create and edit tasks</option>
-              <option value="Manager">Manager - Can manage team and review</option>
+              <option value="Manager">
+                Manager - Can manage team and review
+              </option>
               <option value="Admin">Admin - Full control</option>
               <option value="Viewer">Viewer - Read-only access</option>
             </select>
@@ -219,8 +223,9 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
 
           <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
             <p className="text-sm text-blue-900">
-              An invitation email will be sent to <strong>{email || "the user"}</strong> with
-              instructions to join the workspace.
+              An invitation email will be sent to{" "}
+              <strong>{email || "the user"}</strong> with instructions to join
+              the workspace.
             </p>
           </div>
 
@@ -259,7 +264,9 @@ function AccessManagementDialog({ onClose }: { onClose: () => void }) {
     setUsers((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
     );
-    alert(`Role updated for user ${userId} to ${newRole}\n\nNote: This is a demo. In production, this would update the database.`);
+    alert(
+      `Role updated for user ${userId} to ${newRole}\n\nNote: This is a demo. In production, this would update the database.`,
+    );
   }
 
   function handleRevokeAccess(userId: string) {
@@ -269,10 +276,12 @@ function AccessManagementDialog({ onClose }: { onClose: () => void }) {
     const confirmed = confirm(
       `Are you sure you want to revoke access for ${user.name}?\n\nThey will be immediately removed from the workspace and lose all access.`,
     );
-    
+
     if (confirmed) {
       setUsers((prev) => prev.filter((u) => u.id !== userId));
-      alert(`Access revoked for ${user.name}\n\nNote: This is a demo. In production, this would update the database.`);
+      alert(
+        `Access revoked for ${user.name}\n\nNote: This is a demo. In production, this would update the database.`,
+      );
     }
   }
 
@@ -309,12 +318,16 @@ function AccessManagementDialog({ onClose }: { onClose: () => void }) {
                 {user.initials}
               </span>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">{user.name}</p>
+                <p className="text-sm font-medium text-foreground">
+                  {user.name}
+                </p>
                 <p className="text-xs text-muted-foreground">{user.email}</p>
               </div>
               <select
                 value={user.role}
-                onChange={(e) => handleRoleChange(user.id, e.target.value as Role)}
+                onChange={(e) =>
+                  handleRoleChange(user.id, e.target.value as Role)
+                }
                 disabled={user.id === "u1"} // Prevent changing own role
                 className="px-2.5 py-1.5 rounded-md border border-border bg-white text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -338,8 +351,8 @@ function AccessManagementDialog({ onClose }: { onClose: () => void }) {
         <div className="border-t border-border p-4">
           <div className="rounded-md bg-amber-50 border border-amber-200 p-3 mb-3">
             <p className="text-xs text-amber-900">
-              <strong>Warning:</strong> Role changes take effect immediately. Revoking access
-              will remove the user from all projects and tasks.
+              <strong>Warning:</strong> Role changes take effect immediately.
+              Revoking access will remove the user from all projects and tasks.
             </p>
           </div>
           <button

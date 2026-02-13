@@ -283,7 +283,12 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const addTimeEntry = useCallback(
     (
       taskId: string,
-      data: { date: string; minutes: number; note?: string; subtaskId?: string },
+      data: {
+        date: string;
+        minutes: number;
+        note?: string;
+        subtaskId?: string;
+      },
       user: User,
     ): TimeEntry => {
       const newEntry: TimeEntry = {

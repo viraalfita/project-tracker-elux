@@ -149,3 +149,209 @@ export function calculateUtilizationAggregates(
     totalUsers: utilization.length,
   };
 }
+
+// ═══════════════════════════════════════════════════════════════════════════
+// KPI CSV EXPORT UTILITIES
+// Generates task-level CSV export for monitoring and reporting
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface KpiCsvRow {
+  taskId: string;
+  taskTitle: string;
+  epicName: string;
+  assigneeName: string;
+  status: string;
+  priority: string;
+  estimateHours: string;
+  totalLoggedHours: string;
+  createdDate: string;
+  inProgressDate: string;
+  completedDate: string;
+  dueDate: string;
+  cycleTimeDays: string;
+  overdue: string;
+  atRisk: string;
+  estimateAccuracyRatio: string;
+}
+
+/**
+ * Build KPI CSV rows from tasks
+ * @param tasks - Tasks to export
+ * @param epics - All epics (for epic name lookup)
+ * @returns Array of CSV row data
+ */
+export function buildKpiCsvRows(
+  tasks: Task[],
+  epics: { id: string; title: string }[],
+): KpiCsvRow[] {
+  const NOW = new Date("2026-02-10");
+
+  return tasks.map((task) => {
+    const epic = epics.find((e) => e.id === task.epicId);
+    const epicName = epic?.title || "Unknown Epic";
+    const assigneeName = task.assignee?.name || "Unassigned";
+
+    // Calculate totalLoggedHours
+    const totalMinutes = task.timeEntries.reduce(
+      (sum, entry) => sum + entry.minutes,
+      0,
+    );
+    const totalLoggedHours = totalMinutes / 60;
+
+    // Extract status dates (simulated - in real app these would be tracked)
+    // For MVP, we'll use approximations based on current status
+    const createdDate = ""; // Not tracked in MVP
+    
+    // Simulate inProgressDate
+    const inProgressDate =
+      task.status === "In Progress" || task.status === "Review" || task.status === "Done"
+        ? (() => {
+            const dueDate = new Date(task.dueDate);
+            const startDate = new Date(dueDate);
+            startDate.setDate(dueDate.getDate() - 3);
+            return startDate.toISOString().split("T")[0];
+          })()
+        : "";
+
+    // Simulate completedDate
+    const completedDate = task.status === "Done" ? task.dueDate : "";
+
+    // Calculate cycleTimeDays
+    const cycleTimeDays =
+      inProgressDate && completedDate
+        ? (() => {
+            const start = new Date(inProgressDate);
+            const end = new Date(completedDate);
+            const days = Math.round(
+              (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24),
+            );
+            return days.toString();
+          })()
+        : "";
+
+    // Calculate overdue
+    const overdue = (() => {
+      if (!task.dueDate) return "";
+      const dueDate = new Date(task.dueDate);
+      if (task.status === "Done" && completedDate) {
+        const completed = new Date(completedDate);
+        return completed > dueDate ? "Yes" : "No";
+      } else if (task.status !== "Done") {
+        return NOW > dueDate ? "Yes" : "No";
+      }
+      return "";
+    })();
+
+    // Calculate atRisk
+    const atRisk = (() => {
+      if (task.estimate && totalLoggedHours > task.estimate) {
+        return "Yes";
+      } else if (task.status === "In Progress" && task.priority === "High") {
+        return "Yes";
+      }
+      return "No";
+    })();
+
+    // Calculate estimateAccuracyRatio
+    const estimateAccuracyRatio =
+      task.estimate && task.estimate > 0
+        ? (totalLoggedHours / task.estimate).toFixed(2)
+        : "";
+
+    return {
+      taskId: task.id,
+      taskTitle: task.title,
+      epicName,
+      assigneeName,
+      status: task.status,
+      priority: task.priority,
+      estimateHours: task.estimate?.toString() || "",
+      totalLoggedHours: totalLoggedHours.toFixed(2),
+      createdDate,
+      inProgressDate,
+      completedDate,
+      dueDate: task.dueDate,
+      cycleTimeDays,
+      overdue,
+      atRisk,
+      estimateAccuracyRatio,
+    };
+  });
+}
+
+/**
+ * Convert CSV rows to CSV string
+ */
+function rowsToCSV(rows: KpiCsvRow[]): string {
+  const headers = [
+    "taskId",
+    "taskTitle",
+    "epicName",
+    "assigneeName",
+    "status",
+    "priority",
+    "estimateHours",
+    "totalLoggedHours",
+    "createdDate",
+    "inProgressDate",
+    "completedDate",
+    "dueDate",
+    "cycleTimeDays",
+    "overdue",
+    "atRisk",
+    "estimateAccuracyRatio",
+  ];
+
+  const csvRows = [
+    headers.join(","),
+    ...rows.map((row) =>
+      headers
+        .map((header) => {
+          const value = row[header as keyof KpiCsvRow];
+          // Escape quotes and wrap in quotes if contains comma
+          const escaped = value.replace(/"/g, '""');
+          return escaped.includes(",") ? `"${escaped}"` : escaped;
+        })
+        .join(","),
+    ),
+  ];
+
+  return csvRows.join("\n");
+}
+
+/**
+ * Generate and download CSV file
+ * @param tasks - Tasks to export
+ * @param epics - All epics for name lookup
+ * @param filename - Optional filename (defaults to kpi-export-YYYY-MM-DD.csv)
+ */
+export function downloadKpiCsv(
+  tasks: Task[],
+  epics: { id: string; title: string }[],
+  filename?: string,
+): void {
+  if (tasks.length === 0) {
+    alert("No data to export");
+    return;
+  }
+
+  const rows = buildKpiCsvRows(tasks, epics);
+  const csv = rowsToCSV(rows);
+
+  // Generate filename
+  const today = new Date();
+  const dateStr = today.toISOString().split("T")[0];
+  const finalFilename = filename || `kpi-export-${dateStr}.csv`;
+
+  // Create blob and trigger download
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+
+  link.setAttribute("href", url);
+  link.setAttribute("download", finalFilename);
+  link.style.visibility = "hidden";
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
