@@ -5,6 +5,7 @@ import { AvatarChip, UnassignedChip } from "@/components/shared/AvatarChip";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { UserSelect } from "@/components/shared/UserSelect";
+import { WatchersSection } from "@/components/shared/WatchersSection";
 import { AttachmentsSection } from "@/components/task/AttachmentsSection";
 import { CommentsSection } from "@/components/task/CommentsSection";
 import { ExternalLinksSection } from "@/components/task/ExternalLinksSection";
@@ -22,7 +23,7 @@ import {
 import { TaskStatus, User } from "@/lib/types";
 import { AlertTriangle, CalendarDays, Clock, Trash2 } from "lucide-react";
 import { notFound } from "next/navigation";
-import { use, useState } from "react";
+import { use, useEffect, useState } from "react";
 
 const STATUSES: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 
@@ -32,7 +33,7 @@ interface TaskPageProps {
 
 export default function TaskPage({ params }: TaskPageProps) {
   const { taskId } = use(params);
-  const { tasks, epics, updateTask, deleteTimeEntry } = useDataStore();
+  const { tasks, epics, updateTask, updateTaskWatchers, deleteTimeEntry } = useDataStore();
   const { currentUser } = useAuth();
 
   const task = tasks.find((t) => t.id === taskId);
@@ -73,6 +74,20 @@ export default function TaskPage({ params }: TaskPageProps) {
       (currentUser.role === "Member" &&
         epic &&
         canViewEpic(currentUser, epic.id)));
+
+  // Check for overdue and notify watchers (MVP: on page load)
+  useEffect(() => {
+    if (task.dueDate && task.status !== "Done" && task.watchers.length > 0) {
+      const NOW = new Date("2026-02-10");
+      const dueDate = new Date(task.dueDate);
+      if (NOW > dueDate) {
+        console.log(
+          `[Overdue Alert] Task "${task.title}" is overdue (due: ${task.dueDate}). Notifying:`,
+          task.watchers.map((w) => w.name),
+        );
+      }
+    }
+  }, [task]);
 
   function handleStatusChange(newStatus: TaskStatus) {
     setStatus(newStatus);
@@ -215,6 +230,17 @@ export default function TaskPage({ params }: TaskPageProps) {
                   <span className="text-sm text-indigo-600 bg-indigo-50 rounded px-2 py-0.5">
                     {epic.title}
                   </span>
+                </div>
+              )}
+              
+              {/* Watchers */}
+              {epic && (
+                <div className="flex flex-col gap-1 min-w-[220px]">
+                  <WatchersSection
+                    watchers={task.watchers}
+                    epicId={epic.id}
+                    onUpdate={updateTaskWatchers.bind(null, task.id)}
+                  />
                 </div>
               )}
             </div>

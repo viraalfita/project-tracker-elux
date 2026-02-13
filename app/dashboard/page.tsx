@@ -140,7 +140,7 @@ export default function DashboardPage() {
                       ))}
                     </select>
                   </div>
-                  
+
                   {/* Export KPI CSV button */}
                   <button
                     onClick={() => downloadKpiCsv(kpiTasks, EPICS)}

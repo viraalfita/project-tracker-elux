@@ -37,6 +37,7 @@ interface DataStoreContextType {
       ownerId?: string;
     },
   ) => void;
+  updateEpicWatchers: (epicId: string, watcherIds: string[]) => void;
   deleteEpic: (id: string) => void;
   // Task CRUD
   createTask: (data: {
@@ -53,6 +54,7 @@ interface DataStoreContextType {
       Pick<Task, "title" | "description" | "status" | "priority">
     > & { assigneeId?: string },
   ) => void;
+  updateTaskWatchers: (taskId: string, watcherIds: string[]) => void;
   deleteTask: (id: string) => void;
   // Subtask CRUD
   createSubtask: (
@@ -128,6 +130,18 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const updateEpicWatchers = useCallback((epicId: string, watcherIds: string[]) => {
+    setEpics((prev) =>
+      prev.map((e) => {
+        if (e.id !== epicId) return e;
+        const watchers = USERS.filter((u) => watcherIds.includes(u.id));
+        // Simulate notification to watchers
+        console.log(`[Notification] Epic "${e.title}" watchers updated:`, watchers.map(w => w.name));
+        return { ...e, watchers };
+      }),
+    );
+  }, []);
+
   const deleteEpic = useCallback((id: string) => {
     setEpics((prev) => prev.filter((e) => e.id !== id));
     setTasks((prev) => prev.filter((t) => t.epicId !== id));
@@ -187,12 +201,31 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
               ? USERS.find((u) => u.id === data.assigneeId) || null
               : null;
           }
+          // Notify watchers on status change
+          if (data.status && data.status !== t.status && t.watchers.length > 0) {
+            console.log(
+              `[Notification] Task "${t.title}" status changed to ${data.status}. Notifying:`,
+              t.watchers.map((w) => w.name),
+            );
+          }
           return updated;
         }),
       );
     },
     [],
   );
+
+  const updateTaskWatchers = useCallback((taskId: string, watcherIds: string[]) => {
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        const watchers = USERS.filter((u) => watcherIds.includes(u.id));
+        // Simulate notification to watchers
+        console.log(`[Notification] Task "${t.title}" watchers updated:`, watchers.map(w => w.name));
+        return { ...t, watchers };
+      }),
+    );
+  }, []);
 
   const deleteTask = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -301,11 +334,29 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         note: data.note,
       };
       setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId
-            ? { ...t, timeEntries: [...t.timeEntries, newEntry] }
-            : t,
-        ),
+        prev.map((t) => {
+          if (t.id !== taskId) return t;
+          const updatedTask = { ...t, timeEntries: [...t.timeEntries, newEntry] };
+          
+          // Check if task is now at risk (EWS trigger)
+          if (t.estimate) {
+            const totalMinutes = updatedTask.timeEntries.reduce(
+              (sum, entry) => sum + entry.minutes,
+              0,
+            );
+            const totalHours = totalMinutes / 60;
+            
+            // Notify watchers if time logged exceeds estimate
+            if (totalHours > t.estimate && t.watchers.length > 0) {
+              console.log(
+                `[EWS Alert] Task "${t.title}" is at risk (${totalHours.toFixed(1)}h logged > ${t.estimate}h estimate). Notifying:`,
+                t.watchers.map((w) => w.name),
+              );
+            }
+          }
+          
+          return updatedTask;
+        }),
       );
       return newEntry;
     },
@@ -329,9 +380,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         tasks,
         createEpic,
         updateEpic,
+        updateEpicWatchers,
         deleteEpic,
         createTask,
         updateTask,
+        updateTaskWatchers,
         deleteTask,
         createSubtask,
         deleteSubtask,

@@ -4,6 +4,7 @@ import { AvatarChip } from "@/components/shared/AvatarChip";
 import { ProgressBar } from "@/components/shared/ProgressBar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { UserSelect } from "@/components/shared/UserSelect";
+import { WatchersSection } from "@/components/shared/WatchersSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { getEpicProgress, getTasksByEpic, USERS } from "@/lib/mock";
@@ -17,7 +18,7 @@ interface EpicHeaderProps {
 
 export function EpicHeader({ epic }: EpicHeaderProps) {
   const { currentUser } = useAuth();
-  const { updateEpic } = useDataStore();
+  const { updateEpic, updateEpicWatchers } = useDataStore();
   const [owner, setOwner] = useState<User>(epic.owner);
 
   const progress = getEpicProgress(epic.id);
@@ -47,7 +48,7 @@ export function EpicHeader({ epic }: EpicHeaderProps) {
 
       <ProgressBar value={progress} className="mb-4" />
 
-      <div className="flex flex-wrap items-center gap-5 text-sm text-muted-foreground">
+      <div className="flex flex-wrap items-start gap-5 text-sm text-muted-foreground">
         <div className="flex flex-col gap-1 min-w-[180px]">
           <span className="text-xs uppercase tracking-wide font-medium">
             Owner
@@ -64,6 +65,15 @@ export function EpicHeader({ epic }: EpicHeaderProps) {
             <AvatarChip user={owner} size="sm" showName />
           )}
         </div>
+        
+        <div className="flex flex-col gap-1 min-w-[220px]">
+          <WatchersSection
+            watchers={epic.watchers}
+            epicId={epic.id}
+            onUpdate={updateEpicWatchers.bind(null, epic.id)}
+          />
+        </div>
+
         <div className="flex items-center gap-1.5">
           <ListChecks className="h-4 w-4" />
           <span>

@@ -186,3 +186,19 @@ export function canWrite(user: User | null): boolean {
     user.role === "Admin" || user.role === "Manager" || user.role === "Member"
   );
 }
+
+/**
+ * Returns true if the user can manage watchers on an Epic/Task.
+ * - Admin: YES (can manage watchers everywhere)
+ * - Manager: NO (read-only)
+ * - Member: YES (only in epics they have access to)
+ * - Viewer: NO (read-only)
+ */
+export function canManageWatchers(user: User | null, epicId?: string): boolean {
+  if (!user) return false;
+  if (user.role === "Admin") return true;
+  if (user.role === "Manager" || user.role === "Viewer") return false;
+  // Member: only in their epics
+  if (!epicId) return false;
+  return EPIC_MEMBERS[epicId]?.includes(user.id) ?? false;
+}

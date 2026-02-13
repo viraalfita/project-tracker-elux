@@ -201,10 +201,12 @@ export function buildKpiCsvRows(
     // Extract status dates (simulated - in real app these would be tracked)
     // For MVP, we'll use approximations based on current status
     const createdDate = ""; // Not tracked in MVP
-    
+
     // Simulate inProgressDate
     const inProgressDate =
-      task.status === "In Progress" || task.status === "Review" || task.status === "Done"
+      task.status === "In Progress" ||
+      task.status === "Review" ||
+      task.status === "Done"
         ? (() => {
             const dueDate = new Date(task.dueDate);
             const startDate = new Date(dueDate);
