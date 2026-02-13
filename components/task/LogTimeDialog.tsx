@@ -12,15 +12,19 @@ interface LogTimeDialogProps {
 }
 
 export function LogTimeDialog({ taskId, onClose }: LogTimeDialogProps) {
-  const { addTimeEntry } = useDataStore();
+  const { addTimeEntry, tasks } = useDataStore();
   const { currentUser } = useAuth();
   const { toast } = useToast();
+
+  const task = tasks.find((t) => t.id === taskId);
+  const subtasks = task?.subtasks || [];
 
   const today = new Date().toISOString().split("T")[0];
   const [date, setDate] = useState(today);
   const [hours, setHours] = useState("");
   const [minutes, setMinutes] = useState("");
   const [note, setNote] = useState("");
+  const [selectedSubtaskId, setSelectedSubtaskId] = useState<string>("");
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -43,12 +47,16 @@ export function LogTimeDialog({ taskId, onClose }: LogTimeDialogProps) {
         date,
         minutes: totalMinutes,
         note: note.trim() || undefined,
+        subtaskId: selectedSubtaskId || undefined,
       },
       currentUser,
     );
 
+    const subtaskLabel = selectedSubtaskId
+      ? ` (${subtasks.find((s) => s.id === selectedSubtaskId)?.title || "Subtask"})`
+      : "";
     toast(
-      `Logged ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m`,
+      `Logged ${Math.floor(totalMinutes / 60)}h ${totalMinutes % 60}m${subtaskLabel}`,
       "success",
     );
     onClose();
@@ -91,6 +99,35 @@ export function LogTimeDialog({ taskId, onClose }: LogTimeDialogProps) {
               className="w-full px-3 py-2 rounded-md border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
           </div>
+
+          {/* Subtask Selection */}
+          {subtasks.length > 0 && (
+            <div>
+              <label
+                htmlFor="subtask"
+                className="block text-sm font-medium text-foreground mb-1"
+              >
+                Subtask <span className="text-muted-foreground">(optional)</span>
+              </label>
+              <select
+                id="subtask"
+                value={selectedSubtaskId}
+                onChange={(e) => setSelectedSubtaskId(e.target.value)}
+                className="w-full px-3 py-2 rounded-md border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              >
+                <option value="">None - Log to main task</option>
+                {subtasks.map((subtask) => (
+                  <option key={subtask.id} value={subtask.id}>
+                    {subtask.done ? "✓ " : ""}
+                    {subtask.title}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-muted-foreground mt-1">
+                Link time entry to a specific subtask
+              </p>
+            </div>
+          )}
 
           {/* Duration */}
           <div>

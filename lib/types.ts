@@ -64,6 +64,7 @@ export interface Subtask {
 export interface TimeEntry {
   id: string;
   taskId: string;
+  subtaskId?: string; // Optional: link to specific subtask
   user: User;
   date: string;
   minutes: number;

@@ -67,7 +67,7 @@ interface DataStoreContextType {
   // Time Entry CRUD
   addTimeEntry: (
     taskId: string,
-    data: { date: string; minutes: number; note?: string },
+    data: { date: string; minutes: number; note?: string; subtaskId?: string },
     user: User,
   ) => TimeEntry;
   deleteTimeEntry: (taskId: string, entryId: string) => void;
@@ -283,12 +283,13 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const addTimeEntry = useCallback(
     (
       taskId: string,
-      data: { date: string; minutes: number; note?: string },
+      data: { date: string; minutes: number; note?: string; subtaskId?: string },
       user: User,
     ): TimeEntry => {
       const newEntry: TimeEntry = {
         id: `te-${Date.now()}`,
         taskId,
+        subtaskId: data.subtaskId,
         user,
         date: data.date,
         minutes: data.minutes,

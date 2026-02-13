@@ -22,7 +22,7 @@ export function canViewEpic(user: User | null, epicId: string): boolean {
 /**
  * Returns true if the user can manage epics (create/edit/delete at workspace level).
  * - Admin: YES (full control)
- * - Manager: NO (read-only)
+ * - Manager: NO (cannot create/delete epics at workspace level)
  * - Member: NO (cannot manage workspace-level settings)
  * - Viewer: NO (read-only)
  */
@@ -34,14 +34,15 @@ export function canManageEpics(user: User | null): boolean {
 /**
  * Returns true if the user can create entities (tasks, subtasks) in an epic.
  * - Admin: YES (everywhere)
- * - Manager: NO (read-only)
+ * - Manager: YES (can create tasks for their own work)
  * - Member: YES (only in assigned epics)
  * - Viewer: NO (read-only)
  */
 export function canCreate(user: User | null, epicId?: string): boolean {
   if (!user) return false;
   if (user.role === "Admin") return true;
-  if (user.role === "Manager" || user.role === "Viewer") return false;
+  if (user.role === "Manager") return true;
+  if (user.role === "Viewer") return false;
   // Member: only inside epics they belong to
   if (!epicId) return false;
   return EPIC_MEMBERS[epicId]?.includes(user.id) ?? false;
@@ -50,7 +51,7 @@ export function canCreate(user: User | null, epicId?: string): boolean {
 /**
  * Returns true if the user can edit entities (epics, tasks, subtasks) in an epic.
  * - Admin: YES (everywhere)
- * - Manager: NO (read-only)
+ * - Manager: YES (can edit their own tasks)
  * - Member: YES (only in assigned epics)
  * - Viewer: NO (read-only)
  */
@@ -61,7 +62,7 @@ export function canEdit(user: User | null, epicId?: string): boolean {
 /**
  * Returns true if the user can delete an entity.
  * - Admin: YES (can delete anything)
- * - Manager: NO (read-only)
+ * - Manager: YES (can delete their own tasks)
  * - Member: YES (in assigned epics; for comments, only their own)
  * - Viewer: NO (read-only)
  *
@@ -74,7 +75,8 @@ export function canDelete(
 ): boolean {
   if (!user) return false;
   if (user.role === "Admin") return true;
-  if (user.role === "Manager" || user.role === "Viewer") return false;
+  if (user.role === "Manager") return true;
+  if (user.role === "Viewer") return false;
   // Member: must be in the epic
   const inEpic = epicId
     ? (EPIC_MEMBERS[epicId]?.includes(user.id) ?? false)
@@ -88,14 +90,15 @@ export function canDelete(
 /**
  * Returns true if the user can update task/epic status.
  * - Admin: YES (everywhere)
- * - Manager: NO (read-only, cannot mutate anything)
+ * - Manager: YES (can update status for their tasks and reviews)
  * - Member: YES (only in assigned epics)
  * - Viewer: NO (read-only)
  */
 export function canUpdateStatus(user: User | null, epicId?: string): boolean {
   if (!user) return false;
   if (user.role === "Admin") return true;
-  if (user.role === "Manager" || user.role === "Viewer") return false;
+  if (user.role === "Manager") return true;
+  if (user.role === "Viewer") return false;
   // Member: only in their epics
   if (!epicId) return false;
   return EPIC_MEMBERS[epicId]?.includes(user.id) ?? false;
@@ -104,14 +107,15 @@ export function canUpdateStatus(user: User | null, epicId?: string): boolean {
 /**
  * Returns true if the user can assign tasks to other users.
  * - Admin: YES (can assign to anyone)
- * - Manager: NO (read-only, cannot mutate)
+ * - Manager: YES (can assign tasks within their scope)
  * - Member: YES (only within assigned epics, to members of same epic)
  * - Viewer: NO (read-only)
  */
 export function canAssignTask(user: User | null, epicId?: string): boolean {
   if (!user) return false;
   if (user.role === "Admin") return true;
-  if (user.role === "Manager" || user.role === "Viewer") return false;
+  if (user.role === "Manager") return true;
+  if (user.role === "Viewer") return false;
   // Member: only in their epics
   if (!epicId) return false;
   return EPIC_MEMBERS[epicId]?.includes(user.id) ?? false;
@@ -120,14 +124,15 @@ export function canAssignTask(user: User | null, epicId?: string): boolean {
 /**
  * Returns true if the user can post comments.
  * - Admin: YES (everywhere)
- * - Manager: NO (read-only, CANNOT comment per PRD)
+ * - Manager: YES (can comment on tasks they manage/review)
  * - Member: YES (only in assigned epics)
  * - Viewer: NO (read-only, CANNOT comment)
  */
 export function canComment(user: User | null, epicId?: string): boolean {
   if (!user) return false;
   if (user.role === "Admin") return true;
-  if (user.role === "Manager" || user.role === "Viewer") return false;
+  if (user.role === "Manager") return true;
+  if (user.role === "Viewer") return false;
   // Member: only in their epics
   if (!epicId) return false;
   return EPIC_MEMBERS[epicId]?.includes(user.id) ?? false;
@@ -136,21 +141,22 @@ export function canComment(user: User | null, epicId?: string): boolean {
 /**
  * Returns the list of users that can be assigned to tasks/subtasks in an epic.
  * - Admin: All users in the workspace
+ * - Manager: All users in the workspace (can assign to team members)
  * - Member: Only users who are members of the same epic
- * - Manager/Viewer: Empty array (cannot assign)
+ * - Viewer: Empty array (cannot assign)
  */
 export function getAssignableUsers(
   user: User | null,
   epicId: string,
 ): string[] {
   if (!user) return [];
-  if (user.role === "Admin") {
-    // Admin can assign to anyone
+  if (user.role === "Admin" || user.role === "Manager") {
+    // Admin and Manager can assign to anyone
     return Object.keys(EPIC_MEMBERS).reduce((acc, eid) => {
       return [...new Set([...acc, ...(EPIC_MEMBERS[eid] || [])])];
     }, [] as string[]);
   }
-  if (user.role === "Manager" || user.role === "Viewer") return [];
+  if (user.role === "Viewer") return [];
   // Member: only users in the same epic
   return EPIC_MEMBERS[epicId] || [];
 }
@@ -178,5 +184,5 @@ export function canMoveFromReview(user: User | null): boolean {
  */
 export function canWrite(user: User | null): boolean {
   if (!user) return false;
-  return user.role === "Admin" || user.role === "Member";
+  return user.role === "Admin" || user.role === "Manager" || user.role === "Member";
 }
