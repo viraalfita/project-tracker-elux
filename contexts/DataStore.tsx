@@ -130,17 +130,23 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const updateEpicWatchers = useCallback((epicId: string, watcherIds: string[]) => {
-    setEpics((prev) =>
-      prev.map((e) => {
-        if (e.id !== epicId) return e;
-        const watchers = USERS.filter((u) => watcherIds.includes(u.id));
-        // Simulate notification to watchers
-        console.log(`[Notification] Epic "${e.title}" watchers updated:`, watchers.map(w => w.name));
-        return { ...e, watchers };
-      }),
-    );
-  }, []);
+  const updateEpicWatchers = useCallback(
+    (epicId: string, watcherIds: string[]) => {
+      setEpics((prev) =>
+        prev.map((e) => {
+          if (e.id !== epicId) return e;
+          const watchers = USERS.filter((u) => watcherIds.includes(u.id));
+          // Simulate notification to watchers
+          console.log(
+            `[Notification] Epic "${e.title}" watchers updated:`,
+            watchers.map((w) => w.name),
+          );
+          return { ...e, watchers };
+        }),
+      );
+    },
+    [],
+  );
 
   const deleteEpic = useCallback((id: string) => {
     setEpics((prev) => prev.filter((e) => e.id !== id));
@@ -202,7 +208,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
               : null;
           }
           // Notify watchers on status change
-          if (data.status && data.status !== t.status && t.watchers.length > 0) {
+          if (
+            data.status &&
+            data.status !== t.status &&
+            t.watchers.length > 0
+          ) {
             console.log(
               `[Notification] Task "${t.title}" status changed to ${data.status}. Notifying:`,
               t.watchers.map((w) => w.name),
@@ -215,17 +225,23 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const updateTaskWatchers = useCallback((taskId: string, watcherIds: string[]) => {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== taskId) return t;
-        const watchers = USERS.filter((u) => watcherIds.includes(u.id));
-        // Simulate notification to watchers
-        console.log(`[Notification] Task "${t.title}" watchers updated:`, watchers.map(w => w.name));
-        return { ...t, watchers };
-      }),
-    );
-  }, []);
+  const updateTaskWatchers = useCallback(
+    (taskId: string, watcherIds: string[]) => {
+      setTasks((prev) =>
+        prev.map((t) => {
+          if (t.id !== taskId) return t;
+          const watchers = USERS.filter((u) => watcherIds.includes(u.id));
+          // Simulate notification to watchers
+          console.log(
+            `[Notification] Task "${t.title}" watchers updated:`,
+            watchers.map((w) => w.name),
+          );
+          return { ...t, watchers };
+        }),
+      );
+    },
+    [],
+  );
 
   const deleteTask = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
@@ -336,8 +352,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setTasks((prev) =>
         prev.map((t) => {
           if (t.id !== taskId) return t;
-          const updatedTask = { ...t, timeEntries: [...t.timeEntries, newEntry] };
-          
+          const updatedTask = {
+            ...t,
+            timeEntries: [...t.timeEntries, newEntry],
+          };
+
           // Check if task is now at risk (EWS trigger)
           if (t.estimate) {
             const totalMinutes = updatedTask.timeEntries.reduce(
@@ -345,7 +364,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
               0,
             );
             const totalHours = totalMinutes / 60;
-            
+
             // Notify watchers if time logged exceeds estimate
             if (totalHours > t.estimate && t.watchers.length > 0) {
               console.log(
@@ -354,7 +373,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
               );
             }
           }
-          
+
           return updatedTask;
         }),
       );

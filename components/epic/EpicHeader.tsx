@@ -48,47 +48,53 @@ export function EpicHeader({ epic }: EpicHeaderProps) {
 
       <ProgressBar value={progress} className="mb-4" />
 
-      <div className="flex flex-wrap items-start gap-5 text-sm text-muted-foreground">
-        <div className="flex flex-col gap-1 min-w-[180px]">
-          <span className="text-xs uppercase tracking-wide font-medium">
-            Owner
-          </span>
-          {canChangeOwner ? (
-            <UserSelect
-              users={USERS}
-              value={owner}
-              onChange={handleOwnerChange}
-              placeholder="Select owner..."
-              allowUnassigned={false}
+      <div className="flex items-start justify-between gap-6 text-sm text-muted-foreground">
+        {/* Left side: Owner and Watchers */}
+        <div className="flex flex-wrap items-start gap-5">
+          <div className="flex flex-col gap-1 min-w-[180px]">
+            <span className="text-xs uppercase tracking-wide font-medium">
+              Owner
+            </span>
+            {canChangeOwner ? (
+              <UserSelect
+                users={USERS}
+                value={owner}
+                onChange={handleOwnerChange}
+                placeholder="Select owner..."
+                allowUnassigned={false}
+              />
+            ) : (
+              <AvatarChip user={owner} size="sm" showName />
+            )}
+          </div>
+
+          <div className="flex flex-col gap-1 min-w-[220px]">
+            <WatchersSection
+              watchers={epic.watchers}
+              epicId={epic.id}
+              onUpdate={updateEpicWatchers.bind(null, epic.id)}
             />
-          ) : (
-            <AvatarChip user={owner} size="sm" showName />
-          )}
-        </div>
-        
-        <div className="flex flex-col gap-1 min-w-[220px]">
-          <WatchersSection
-            watchers={epic.watchers}
-            epicId={epic.id}
-            onUpdate={updateEpicWatchers.bind(null, epic.id)}
-          />
+          </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
-          <ListChecks className="h-4 w-4" />
-          <span>
-            <strong className="text-foreground">{doneTasks}</strong> /{" "}
-            {tasks.length} tasks done
-          </span>
-        </div>
-        {epic.startDate && (
+        {/* Right side: Task count and Dates */}
+        <div className="flex flex-col gap-2 items-end text-right">
           <div className="flex items-center gap-1.5">
-            <CalendarDays className="h-4 w-4" />
+            <ListChecks className="h-4 w-4" />
             <span>
-              {epic.startDate} → {epic.endDate ?? "—"}
+              <strong className="text-foreground">{doneTasks}</strong> /{" "}
+              {tasks.length} tasks done
             </span>
           </div>
-        )}
+          {epic.startDate && (
+            <div className="flex items-center gap-1.5">
+              <CalendarDays className="h-4 w-4" />
+              <span>
+                {epic.startDate} → {epic.endDate ?? "—"}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

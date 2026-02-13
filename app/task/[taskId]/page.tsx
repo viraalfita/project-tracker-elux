@@ -33,7 +33,8 @@ interface TaskPageProps {
 
 export default function TaskPage({ params }: TaskPageProps) {
   const { taskId } = use(params);
-  const { tasks, epics, updateTask, updateTaskWatchers, deleteTimeEntry } = useDataStore();
+  const { tasks, epics, updateTask, updateTaskWatchers, deleteTimeEntry } =
+    useDataStore();
   const { currentUser } = useAuth();
 
   const task = tasks.find((t) => t.id === taskId);
@@ -232,7 +233,7 @@ export default function TaskPage({ params }: TaskPageProps) {
                   </span>
                 </div>
               )}
-              
+
               {/* Watchers */}
               {epic && (
                 <div className="flex flex-col gap-1 min-w-[220px]">
@@ -310,7 +311,7 @@ export default function TaskPage({ params }: TaskPageProps) {
                       currentUser &&
                       (currentUser.role === "Admin" ||
                         entry.user.id === currentUser.id);
-                    
+
                     // Find subtask if entry is linked to one
                     const subtask = entry.subtaskId
                       ? task.subtasks.find((s) => s.id === entry.subtaskId)
