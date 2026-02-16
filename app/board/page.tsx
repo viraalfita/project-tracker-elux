@@ -1,11 +1,20 @@
 "use client";
 
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  DragStartEvent,
+  PointerSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { KanbanColumn } from "@/components/board/KanbanColumn";
+import { TaskCard } from "@/components/board/TaskCard";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { EPICS, USERS } from "@/lib/mock";
-import { canMoveFromReview, canWrite } from "@/lib/permissions";
 import { Task, TaskStatus } from "@/lib/types";
 import { ChevronDown, Filter, Kanban, Users, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -17,6 +26,45 @@ export default function BoardPage() {
   const { tasks: initialTasks } = useDataStore();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const { currentUser } = useAuth();
+
+  // ── Drag state ─────────────────────────────────────────────────────────────
+  const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
+  const activeTask = useMemo(
+    () => (activeTaskId ? tasks.find((t) => t.id === activeTaskId) ?? null : null),
+    [activeTaskId, tasks],
+  );
+
+  // Only Admin and Member can drag-and-drop
+  const canDragDrop =
+    currentUser?.role === "Admin" || currentUser?.role === "Member";
+
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+  );
+
+  function handleDragStart(event: DragStartEvent) {
+    setActiveTaskId(event.active.id as string);
+  }
+
+  function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setActiveTaskId(null);
+
+    if (!over) return; // dropped outside any column
+
+    const taskId = active.id as string;
+    const newStatus = over.id as TaskStatus;
+
+    setTasks((prev) =>
+      prev.map((t) => {
+        if (t.id !== taskId) return t;
+        if (t.status === newStatus) return t; // same column — no change
+        return { ...t, status: newStatus };
+      }),
+    );
+  }
 
   // ── Filters ────────────────────────────────────────────────────────────────
   const [searchQuery, setSearchQuery] = useState("");
@@ -117,34 +165,6 @@ export default function BoardPage() {
     setEpicFilter("");
     setDueDateFilter("");
     setAssigneeFilter([]);
-  }
-
-  // ── Move handler ───────────────────────────────────────────────────────────
-  function handleMove(taskId: string, direction: "left" | "right") {
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== taskId) return t;
-        const idx = COLUMNS.indexOf(t.status);
-        const nextIdx = direction === "left" ? idx - 1 : idx + 1;
-        if (nextIdx < 0 || nextIdx >= COLUMNS.length) return t;
-        return { ...t, status: COLUMNS[nextIdx] };
-      }),
-    );
-  }
-
-  // ── Per-column edit permissions ────────────────────────────────────────────
-  // Manager can ONLY move tasks from Review → Done (right), not left.
-  function getColumnCanEdit(status: TaskStatus): boolean {
-    if (!currentUser) return false;
-    if (currentUser.role === "Manager") {
-      return status === "Review" && canMoveFromReview(currentUser);
-    }
-    return canWrite(currentUser);
-  }
-
-  function getColumnAllowMoveLeft(): boolean {
-    if (currentUser?.role === "Manager") return false;
-    return true;
   }
 
   return (
@@ -315,18 +335,30 @@ export default function BoardPage() {
         </div>
 
         {/* Kanban grid */}
-        <div className="grid grid-cols-4 gap-3 flex-1 min-h-0 pb-4">
-          {COLUMNS.map((status) => (
-            <KanbanColumn
-              key={status}
-              status={status}
-              tasks={filteredTasks.filter((t) => t.status === status)}
-              onMove={handleMove}
-              canEdit={getColumnCanEdit(status)}
-              allowMoveLeft={getColumnAllowMoveLeft()}
-            />
-          ))}
-        </div>
+        <DndContext
+          sensors={sensors}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <div className="grid grid-cols-4 gap-3 flex-1 min-h-0 pb-4">
+            {COLUMNS.map((status) => (
+              <KanbanColumn
+                key={status}
+                status={status}
+                tasks={filteredTasks.filter((t) => t.status === status)}
+                canDragDrop={canDragDrop}
+              />
+            ))}
+          </div>
+
+          <DragOverlay>
+            {activeTask ? (
+              <div className="rotate-1 shadow-2xl opacity-95">
+                <TaskCard task={activeTask} canDragDrop={false} />
+              </div>
+            ) : null}
+          </DragOverlay>
+        </DndContext>
       </div>
     </div>
   );

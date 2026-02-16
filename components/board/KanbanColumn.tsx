@@ -1,15 +1,13 @@
+"use client";
+
+import { useDroppable } from "@dnd-kit/core";
 import { Task, TaskStatus } from "@/lib/types";
 import { TaskCard } from "@/components/board/TaskCard";
-
-const COLUMNS: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 
 interface KanbanColumnProps {
   status: TaskStatus;
   tasks: Task[];
-  onMove: (taskId: string, direction: "left" | "right") => void;
-  canEdit: boolean;
-  /** When false, left-move buttons are disabled for all tasks in this column */
-  allowMoveLeft?: boolean;
+  canDragDrop: boolean;
 }
 
 const columnColors: Record<TaskStatus, string> = {
@@ -26,11 +24,21 @@ const headerColors: Record<TaskStatus, string> = {
   "Done": "text-green-700",
 };
 
-export function KanbanColumn({ status, tasks, onMove, canEdit, allowMoveLeft = true }: KanbanColumnProps) {
-  const colIdx = COLUMNS.indexOf(status);
+export function KanbanColumn({ status, tasks, canDragDrop }: KanbanColumnProps) {
+  const { setNodeRef, isOver } = useDroppable({
+    id: status,
+    disabled: !canDragDrop,
+  });
 
   return (
-    <div className={`flex flex-col rounded-xl border ${columnColors[status]} min-h-[500px] w-full`}>
+    <div
+      ref={setNodeRef}
+      className={`flex flex-col rounded-xl border ${columnColors[status]} min-h-[500px] w-full transition-all ${
+        isOver && canDragDrop
+          ? "ring-2 ring-inset ring-indigo-400 brightness-[0.97]"
+          : ""
+      }`}
+    >
       {/* Column header */}
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-inherit">
         <span className={`text-sm font-semibold ${headerColors[status]}`}>{status}</span>
@@ -47,15 +55,7 @@ export function KanbanColumn({ status, tasks, onMove, canEdit, allowMoveLeft = t
           </div>
         )}
         {tasks.map((task) => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            canMoveLeft={allowMoveLeft && colIdx > 0}
-            canMoveRight={colIdx < COLUMNS.length - 1}
-            onMoveLeft={() => onMove(task.id, "left")}
-            onMoveRight={() => onMove(task.id, "right")}
-            canEdit={canEdit}
-          />
+          <TaskCard key={task.id} task={task} canDragDrop={canDragDrop} />
         ))}
       </div>
     </div>

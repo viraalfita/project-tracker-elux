@@ -1,3 +1,6 @@
+"use client";
+
+import { useDraggable } from "@dnd-kit/core";
 import { AvatarChip, UnassignedChip } from "@/components/shared/AvatarChip";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { EPICS } from "@/lib/mock";
@@ -7,23 +10,17 @@ import Link from "next/link";
 
 interface TaskCardProps {
   task: Task;
-  onMoveLeft?: () => void;
-  onMoveRight?: () => void;
-  canMoveLeft: boolean;
-  canMoveRight: boolean;
-  canEdit: boolean;
+  canDragDrop: boolean;
 }
 
-export function TaskCard({
-  task,
-  onMoveLeft,
-  onMoveRight,
-  canMoveLeft,
-  canMoveRight,
-  canEdit,
-}: TaskCardProps) {
+export function TaskCard({ task, canDragDrop }: TaskCardProps) {
   const epic = EPICS.find((e) => e.id === task.epicId);
   const isOverdue = new Date(task.dueDate) < new Date("2026-02-10");
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+    disabled: !canDragDrop,
+  });
 
   // At Risk logic: time logged > 1.2x estimate
   const totalMinutesLogged = task.timeEntries.reduce(
@@ -36,7 +33,14 @@ export function TaskCard({
     estimateHours > 0 && totalHoursLogged > estimateHours * 1.2;
 
   return (
-    <div className="group rounded-lg border border-border bg-white p-3 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all">
+    <div
+      ref={setNodeRef}
+      {...attributes}
+      {...listeners}
+      className={`group rounded-lg border border-border bg-white p-3 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all select-none ${
+        canDragDrop ? "cursor-grab active:cursor-grabbing" : ""
+      } ${isDragging ? "opacity-40" : ""}`}
+    >
       {/* Epic tag */}
       {epic && (
         <span className="inline-block mb-2 text-xs text-indigo-600 bg-indigo-50 rounded px-1.5 py-0.5 truncate max-w-full">
@@ -45,7 +49,10 @@ export function TaskCard({
       )}
 
       {/* Title — clickable */}
-      <Link href={`/task/${task.id}`}>
+      <Link
+        href={`/task/${task.id}`}
+        onClick={(e) => isDragging && e.preventDefault()}
+      >
         <p className="text-sm font-medium text-foreground mb-2 leading-snug group-hover:text-indigo-700 transition-colors cursor-pointer">
           {task.title}
           {isOverBudget && (
@@ -87,32 +94,6 @@ export function TaskCard({
           </span>
         )}
       </div>
-
-      {/* Move buttons — hidden for read-only roles */}
-      {canEdit ? (
-        <div className="flex gap-1 mt-3 pt-2 border-t border-border">
-          <button
-            onClick={onMoveLeft}
-            disabled={!canMoveLeft}
-            className="flex-1 rounded text-xs py-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            ← Move left
-          </button>
-          <button
-            onClick={onMoveRight}
-            disabled={!canMoveRight}
-            className="flex-1 rounded text-xs py-1 text-muted-foreground hover:bg-accent hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          >
-            Move right →
-          </button>
-        </div>
-      ) : (
-        <div className="mt-3 pt-2 border-t border-border">
-          <p className="text-center text-xs text-muted-foreground/60">
-            Read-only
-          </p>
-        </div>
-      )}
     </div>
   );
 }
