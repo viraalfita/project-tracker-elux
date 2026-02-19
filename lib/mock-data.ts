@@ -77,32 +77,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
           createdAt: "2026-02-05 14:30",
         },
       ],
-      timeEntries: [
-        {
-          id: "te1-1",
-          taskId: "t1",
-          user: USERS[4],
-          date: "2026-02-01",
-          minutes: 240,
-          note: "Design mockups and wireframes",
-        },
-        {
-          id: "te1-2",
-          taskId: "t1",
-          user: USERS[2],
-          date: "2026-02-03",
-          minutes: 360,
-          note: "Frontend implementation",
-        },
-        {
-          id: "te1-3",
-          taskId: "t1",
-          user: USERS[2],
-          date: "2026-02-04",
-          minutes: 180,
-          note: "Mobile responsive fixes",
-        },
-      ],
       owner: USERS[2], // Frontend Dev
       watchers: [USERS[0], USERS[1]], // Admin, Manager
       attachments: [
@@ -189,32 +163,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
           createdAt: "2026-02-10 09:15",
         },
       ],
-      timeEntries: [
-        {
-          id: "te2-1",
-          taskId: "t2",
-          user: USERS[2],
-          date: "2026-02-06",
-          minutes: 480,
-          note: "Infinite scroll and filter sidebar",
-        },
-        {
-          id: "te2-2",
-          taskId: "t2",
-          user: USERS[2],
-          date: "2026-02-07",
-          minutes: 540,
-          note: "Sort dropdown and debugging",
-        },
-        {
-          id: "te2-3",
-          taskId: "t2",
-          user: USERS[2],
-          date: "2026-02-08",
-          minutes: 420,
-          note: "Quick view modal in progress - took longer than expected",
-        },
-      ],
     },
     {
       id: "t3",
@@ -258,7 +206,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t4",
@@ -299,7 +246,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t5",
@@ -351,7 +297,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
           createdAt: "2026-02-11 16:20",
         },
       ],
-      timeEntries: [],
     },
     {
       id: "t6",
@@ -385,7 +330,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t7",
@@ -422,7 +366,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -480,7 +423,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
           createdAt: "2026-02-13 11:45",
         },
       ],
-      timeEntries: [],
     },
     {
       id: "t9",
@@ -517,7 +459,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t10",
@@ -559,7 +500,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t11",
@@ -593,7 +533,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t12",
@@ -629,7 +568,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -668,7 +606,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t14",
@@ -709,7 +646,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t15",
@@ -738,7 +674,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         { id: "s15-3", taskId: "t15", title: "Add sync logic", done: false },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t16",
@@ -767,7 +702,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t17",
@@ -801,7 +735,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -857,7 +790,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
           createdAt: "2026-02-08 08:00",
         },
       ],
-      timeEntries: [],
     },
     {
       id: "t19",
@@ -901,7 +833,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t20",
@@ -936,7 +867,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t21",
@@ -970,7 +900,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1009,7 +938,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t23",
@@ -1043,7 +971,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t24",
@@ -1073,7 +1000,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t25",
@@ -1102,7 +1028,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         { id: "s25-3", taskId: "t25", title: "Build tracking UI", done: false },
       ],
       comments: [],
-      timeEntries: [],
     },
 
     // ═══════════════════════════════════════════════════════════════════════════
@@ -1151,7 +1076,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t27",
@@ -1195,7 +1119,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t28",
@@ -1232,7 +1155,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
     {
       id: "t29",
@@ -1269,7 +1191,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       comments: [],
-      timeEntries: [],
     },
   ];
 

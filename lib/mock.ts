@@ -1,77 +1,67 @@
 import { generateComprehensiveTasks } from "./mock-data";
-import { Epic, Subtask, Task, User } from "./types";
+import { Epic, Goal, Subtask, Task, User } from "./types";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
 export const USERS: User[] = [
   {
     id: "u1",
-    name: "Admin User",
-    email: "admin@tracker.dev",
-    initials: "AU",
+    name: "Arya Pradana",
+    email: "arya.pradana@elux.space",
+    initials: "AP",
     avatarColor: "#6366f1",
     role: "Admin",
     weeklyCapacity: 40,
   },
   {
     id: "u2",
-    name: "Operations Manager",
-    email: "manager@tracker.dev",
-    initials: "OM",
+    name: "Lintang",
+    email: "lintang@inboxkitten.com",
+    initials: "LI",
     avatarColor: "#3b82f6",
     role: "Manager",
     weeklyCapacity: 40,
   },
   {
     id: "u3",
-    name: "Frontend Dev",
-    email: "dev1@tracker.dev",
-    initials: "FD",
+    name: "Dewi",
+    email: "dewi@inboxkitten.com",
+    initials: "DW",
     avatarColor: "#10b981",
-    role: "Member",
+    role: "Manager",
     weeklyCapacity: 40,
   },
   {
     id: "u4",
-    name: "Backend Dev",
-    email: "dev2@tracker.dev",
-    initials: "BD",
+    name: "Ahrasya",
+    email: "ahrasya@inboxkitten.com",
+    initials: "AH",
     avatarColor: "#f59e0b",
-    role: "Member",
+    role: "Manager",
     weeklyCapacity: 40,
   },
   {
     id: "u5",
-    name: "UI Designer",
-    email: "designer@tracker.dev",
-    initials: "UD",
+    name: "Vira",
+    email: "vira@inboxkitten.com",
+    initials: "VI",
     avatarColor: "#ec4899",
     role: "Member",
     weeklyCapacity: 32,
   },
   {
     id: "u6",
-    name: "Stakeholder",
-    email: "viewer@tracker.dev",
-    initials: "SH",
-    avatarColor: "#64748b",
-    role: "Viewer",
-    weeklyCapacity: 0,
+    name: "Aurel",
+    email: "aurel@inboxkitten.com",
+    initials: "AU",
+    avatarColor: "#8b5cf6",
+    role: "Member",
+    weeklyCapacity: 32,
   },
 ];
 
 // Kept for places that need a default fallback; components should prefer useAuth()
 export const CURRENT_USER: User = USERS[0];
-
-// Explicit epic memberships (relevant for Member-role access gating)
-export const EPIC_MEMBERS: Record<string, string[]> = {
-  e1: ["u1", "u2", "u3", "u4", "u5", "u6"], // All users
-  e2: ["u1", "u2", "u3", "u4", "u5"], // All except viewer
-  e3: ["u1", "u2", "u3", "u5"], // Frontend + Designer + Admin/Manager
-  e4: ["u1", "u2", "u4"], // Backend focused
-  e5: ["u1", "u2", "u3", "u4", "u5"], // Full team
-  e6: ["u1", "u2", "u6"], // Minimal visibility
-};
 
 // ─── Epics ────────────────────────────────────────────────────────────────────
 
@@ -81,32 +71,32 @@ export const EPICS: Epic[] = [
     title: "E-Commerce Platform Redesign",
     description:
       "Complete UI/UX overhaul of the customer-facing e-commerce platform. Includes responsive design, checkout flow optimization, and accessibility improvements.",
-    owner: USERS[0], // Admin
-    watchers: [USERS[1], USERS[2]], // Manager, Frontend Dev
+    owner: USERS[0], // Arya (Admin)
+    watchers: [USERS[1], USERS[2]], // Lintang, Dewi
     status: "In Progress",
     startDate: "2026-01-15",
     endDate: "2026-03-15",
-    memberIds: ["u1", "u2", "u3", "u4", "u5", "u6"],
+    memberIds: ["u1", "u2", "u3", "u4", "u5"],
   },
   {
     id: "e2",
     title: "Payment Gateway Integration",
     description:
       "Integrate Stripe and PayPal payment processing with fraud detection, recurring billing support, and multi-currency handling.",
-    owner: USERS[3], // Backend Dev
-    watchers: [USERS[0], USERS[1]], // Admin, Manager
+    owner: USERS[3], // Ahrasya (Manager)
+    watchers: [USERS[0], USERS[1]], // Arya, Lintang
     status: "In Progress",
     startDate: "2026-02-01",
     endDate: "2026-02-28",
-    memberIds: ["u1", "u2", "u3", "u4", "u5"],
+    memberIds: ["u1", "u2", "u3", "u4"],
   },
   {
     id: "e3",
     title: "Mobile App MVP",
     description:
       "Native iOS and Android apps with core features: product browsing, wishlist, push notifications, and quick checkout.",
-    owner: USERS[2], // Frontend Dev
-    watchers: [USERS[0], USERS[4]], // Admin, Designer
+    owner: USERS[2], // Dewi (Manager)
+    watchers: [USERS[0], USERS[4]], // Arya, Vira
     status: "Not Started",
     startDate: "2026-03-01",
     endDate: "2026-04-30",
@@ -117,8 +107,8 @@ export const EPICS: Epic[] = [
     title: "Analytics & Reporting System",
     description:
       "Real-time analytics dashboard for sales, user behavior, conversion tracking, and automated reporting exports.",
-    owner: USERS[0], // Admin
-    watchers: [USERS[1], USERS[3]], // Manager, Backend Dev
+    owner: USERS[0], // Arya (Admin)
+    watchers: [USERS[1], USERS[3]], // Lintang, Ahrasya
     status: "In Progress",
     startDate: "2026-01-20",
     endDate: "2026-02-25",
@@ -129,8 +119,8 @@ export const EPICS: Epic[] = [
     title: "Customer Support Portal",
     description:
       "Self-service portal with ticket system, live chat integration, knowledge base, and order tracking.",
-    owner: USERS[4], // Designer
-    watchers: [USERS[0], USERS[2]], // Admin, Frontend Dev
+    owner: USERS[4], // Vira (Member)
+    watchers: [USERS[0], USERS[2]], // Arya, Dewi
     status: "On Hold",
     startDate: "2026-02-10",
     endDate: "2026-03-20",
@@ -141,12 +131,110 @@ export const EPICS: Epic[] = [
     title: "Infrastructure Migration",
     description:
       "Migrate from AWS EC2 to Kubernetes cluster with auto-scaling, improved monitoring, and disaster recovery setup.",
-    owner: USERS[3], // Backend Dev
-    watchers: [USERS[0]], // Admin only
+    owner: USERS[3], // Ahrasya (Manager)
+    watchers: [USERS[0]], // Arya only
     status: "Done",
     startDate: "2025-12-01",
     endDate: "2026-01-31",
-    memberIds: ["u1", "u2", "u6"],
+    memberIds: ["u1", "u2", "u4", "u6"], // u4 (owner Ahrasya) included explicitly
+  },
+];
+
+// ─── Goals ────────────────────────────────────────────────────────────────────
+
+export const GOALS: Goal[] = [
+  {
+    id: "g1",
+    title: "Launch Refreshed Digital Storefront",
+    description:
+      "Deliver a modern, performant e-commerce experience that increases conversion rate and reduces cart abandonment.",
+    owner: USERS[0], // Arya (Admin)
+    kpis: [
+      {
+        id: "k1",
+        label: "Conversion Rate",
+        current: 2.1,
+        target: 4,
+        unit: "%",
+        greenThreshold: 80,
+        yellowThreshold: 50,
+      },
+      {
+        id: "k2",
+        label: "Cart Abandonment",
+        current: 68,
+        target: 45,
+        unit: "%",
+        greenThreshold: 80,
+        yellowThreshold: 50,
+      },
+      {
+        id: "k3",
+        label: "Page Load Time",
+        current: 3.2,
+        target: 1.5,
+        unit: "s",
+        greenThreshold: 80,
+        yellowThreshold: 50,
+      },
+    ],
+    linkedEpicIds: ["e1", "e2"],
+  },
+  {
+    id: "g2",
+    title: "Expand Mobile Presence",
+    description:
+      "Reach mobile users with native apps and a responsive experience to capture untapped market share.",
+    owner: USERS[1], // Lintang (Manager)
+    kpis: [
+      {
+        id: "k4",
+        label: "Mobile DAU",
+        current: 1200,
+        target: 5000,
+        unit: "users",
+        greenThreshold: 80,
+        yellowThreshold: 50,
+      },
+      {
+        id: "k5",
+        label: "App Store Rating",
+        current: 3.8,
+        target: 4.5,
+        unit: "stars",
+        greenThreshold: 80,
+        yellowThreshold: 50,
+      },
+    ],
+    linkedEpicIds: ["e3"],
+  },
+  {
+    id: "g3",
+    title: "Data-Driven Operations",
+    description:
+      "Build a robust analytics and reporting infrastructure to enable data-informed decision making across the business.",
+    owner: USERS[0], // Arya (Admin)
+    kpis: [
+      {
+        id: "k6",
+        label: "Reports Automated",
+        current: 3,
+        target: 12,
+        unit: "reports",
+        greenThreshold: 80,
+        yellowThreshold: 50,
+      },
+      {
+        id: "k7",
+        label: "Avg Query Time",
+        current: 4.1,
+        target: 0.8,
+        unit: "s",
+        greenThreshold: 80,
+        yellowThreshold: 50,
+      },
+    ],
+    linkedEpicIds: ["e4", "e6"],
   },
 ];
 

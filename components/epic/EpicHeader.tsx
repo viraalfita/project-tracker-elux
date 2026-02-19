@@ -8,6 +8,7 @@ import { WatchersSection } from "@/components/shared/WatchersSection";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { getEpicProgress, getTasksByEpic, USERS } from "@/lib/mock";
+import { isAdmin } from "@/lib/permissions";
 import { Epic, User } from "@/lib/types";
 import { CalendarDays, ListChecks } from "lucide-react";
 import { useState } from "react";
@@ -26,7 +27,7 @@ export function EpicHeader({ epic }: EpicHeaderProps) {
   const doneTasks = tasks.filter((t) => t.status === "Done").length;
 
   // Only Admins can change epic owner
-  const canChangeOwner = currentUser?.role === "Admin";
+  const canChangeOwner = isAdmin(currentUser);
 
   function handleOwnerChange(newOwner: User | null) {
     if (!newOwner) return; // Owner is required
@@ -71,7 +72,7 @@ export function EpicHeader({ epic }: EpicHeaderProps) {
           <div className="flex flex-col gap-1 min-w-[220px]">
             <WatchersSection
               watchers={epic.watchers}
-              epicId={epic.id}
+              epicMemberIds={epic.memberIds}
               onUpdate={updateEpicWatchers.bind(null, epic.id)}
             />
           </div>

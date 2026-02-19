@@ -1,15 +1,16 @@
 "use client";
 
-import { EPICS, TASKS, USERS } from "@/lib/mock";
+import { EPICS, GOALS, TASKS, USERS } from "@/lib/mock";
 import {
   Comment,
   Epic,
   EpicStatus,
+  Goal,
+  GoalKpi,
   Priority,
   Subtask,
   Task,
   TaskStatus,
-  TimeEntry,
   User,
 } from "@/lib/types";
 import {
@@ -21,8 +22,19 @@ import {
 } from "react";
 
 interface DataStoreContextType {
+  goals: Goal[];
   epics: Epic[];
   tasks: Task[];
+  // Goal KPI operations
+  addGoalKpi: (goalId: string, kpi: Omit<GoalKpi, "id">) => void;
+  updateGoalKpi: (
+    goalId: string,
+    kpiId: string,
+    data: Partial<Omit<GoalKpi, "id">>,
+  ) => void;
+  deleteGoalKpi: (goalId: string, kpiId: string) => void;
+  // Goal operations
+  updateGoalLinkedEpics: (goalId: string, epicIds: string[]) => void;
   // Epic CRUD
   createEpic: (data: {
     title: string;
@@ -30,12 +42,14 @@ interface DataStoreContextType {
     ownerId: string;
     status: EpicStatus;
     memberIds?: string[];
+    startDate?: string;
+    endDate?: string;
   }) => Epic;
   updateEpic: (
     id: string,
-    data: Partial<Pick<Epic, "title" | "description" | "status">> & {
-      ownerId?: string;
-    },
+    data: Partial<
+      Pick<Epic, "title" | "description" | "status" | "startDate" | "endDate">
+    > & { ownerId?: string },
   ) => void;
   updateEpicWatchers: (epicId: string, watcherIds: string[]) => void;
   deleteEpic: (id: string) => void;
@@ -66,20 +80,65 @@ interface DataStoreContextType {
   // Comment CRUD
   addComment: (taskId: string, text: string, author: User) => Comment;
   deleteComment: (taskId: string, commentId: string) => void;
-  // Time Entry CRUD
-  addTimeEntry: (
-    taskId: string,
-    data: { date: string; minutes: number; note?: string; subtaskId?: string },
-    user: User,
-  ) => TimeEntry;
-  deleteTimeEntry: (taskId: string, entryId: string) => void;
 }
 
 const DataStoreContext = createContext<DataStoreContextType | null>(null);
 
 export function DataStoreProvider({ children }: { children: ReactNode }) {
+  const [goals, setGoals] = useState<Goal[]>([...GOALS]);
   const [epics, setEpics] = useState<Epic[]>([...EPICS]);
   const [tasks, setTasks] = useState<Task[]>([...TASKS]);
+
+  // ── Goal operations ───────────────────────────────────────────────────────
+
+  const addGoalKpi = useCallback((goalId: string, kpi: Omit<GoalKpi, "id">) => {
+    setGoals((prev) =>
+      prev.map((g) =>
+        g.id === goalId
+          ? { ...g, kpis: [...g.kpis, { ...kpi, id: `kpi-${Date.now()}` }] }
+          : g,
+      ),
+    );
+  }, []);
+
+  const updateGoalKpi = useCallback(
+    (goalId: string, kpiId: string, data: Partial<Omit<GoalKpi, "id">>) => {
+      setGoals((prev) =>
+        prev.map((g) =>
+          g.id === goalId
+            ? {
+                ...g,
+                kpis: g.kpis.map((k) =>
+                  k.id === kpiId ? { ...k, ...data } : k,
+                ),
+              }
+            : g,
+        ),
+      );
+    },
+    [],
+  );
+
+  const deleteGoalKpi = useCallback((goalId: string, kpiId: string) => {
+    setGoals((prev) =>
+      prev.map((g) =>
+        g.id === goalId
+          ? { ...g, kpis: g.kpis.filter((k) => k.id !== kpiId) }
+          : g,
+      ),
+    );
+  }, []);
+
+  const updateGoalLinkedEpics = useCallback(
+    (goalId: string, epicIds: string[]) => {
+      setGoals((prev) =>
+        prev.map((g) =>
+          g.id === goalId ? { ...g, linkedEpicIds: epicIds } : g,
+        ),
+      );
+    },
+    [],
+  );
 
   // ── Epic CRUD ─────────────────────────────────────────────────────────────
 
@@ -90,16 +149,22 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       ownerId: string;
       status: EpicStatus;
       memberIds?: string[];
+      startDate?: string;
+      endDate?: string;
     }): Epic => {
       const owner = USERS.find((u) => u.id === data.ownerId) ?? USERS[0];
+      // Ensure owner is always a member and a watcher of the epic they create.
+      const memberSet = new Set([data.ownerId, ...(data.memberIds ?? [])]);
       const newEpic: Epic = {
         id: `e-${Date.now()}`,
         title: data.title,
         description: data.description,
         owner,
-        watchers: [],
+        watchers: [owner],
         status: data.status,
-        memberIds: data.memberIds || [data.ownerId],
+        startDate: data.startDate || undefined,
+        endDate: data.endDate || undefined,
+        memberIds: Array.from(memberSet),
       };
       setEpics((prev) => [...prev, newEpic]);
       return newEpic;
@@ -110,9 +175,12 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
   const updateEpic = useCallback(
     (
       id: string,
-      data: Partial<Pick<Epic, "title" | "description" | "status">> & {
-        ownerId?: string;
-      },
+      data: Partial<
+        Pick<
+          Epic,
+          "title" | "description" | "status" | "startDate" | "endDate"
+        >
+      > & { ownerId?: string },
     ) => {
       setEpics((prev) =>
         prev.map((e) => {
@@ -180,7 +248,6 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         dueDate: "",
         subtasks: [],
         comments: [],
-        timeEntries: [],
         attachments: [],
         externalLinks: [],
       };
@@ -327,76 +394,17 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     );
   }, []);
 
-  // ── Time Entry CRUD ───────────────────────────────────────────────────────
-
-  const addTimeEntry = useCallback(
-    (
-      taskId: string,
-      data: {
-        date: string;
-        minutes: number;
-        note?: string;
-        subtaskId?: string;
-      },
-      user: User,
-    ): TimeEntry => {
-      const newEntry: TimeEntry = {
-        id: `te-${Date.now()}`,
-        taskId,
-        subtaskId: data.subtaskId,
-        user,
-        date: data.date,
-        minutes: data.minutes,
-        note: data.note,
-      };
-      setTasks((prev) =>
-        prev.map((t) => {
-          if (t.id !== taskId) return t;
-          const updatedTask = {
-            ...t,
-            timeEntries: [...t.timeEntries, newEntry],
-          };
-
-          // Check if task is now at risk (EWS trigger)
-          if (t.estimate) {
-            const totalMinutes = updatedTask.timeEntries.reduce(
-              (sum, entry) => sum + entry.minutes,
-              0,
-            );
-            const totalHours = totalMinutes / 60;
-
-            // Notify watchers if time logged exceeds estimate
-            if (totalHours > t.estimate && t.watchers.length > 0) {
-              console.log(
-                `[EWS Alert] Task "${t.title}" is at risk (${totalHours.toFixed(1)}h logged > ${t.estimate}h estimate). Notifying:`,
-                t.watchers.map((w) => w.name),
-              );
-            }
-          }
-
-          return updatedTask;
-        }),
-      );
-      return newEntry;
-    },
-    [],
-  );
-
-  const deleteTimeEntry = useCallback((taskId: string, entryId: string) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? { ...t, timeEntries: t.timeEntries.filter((e) => e.id !== entryId) }
-          : t,
-      ),
-    );
-  }, []);
 
   return (
     <DataStoreContext.Provider
       value={{
+        goals,
         epics,
         tasks,
+        addGoalKpi,
+        updateGoalKpi,
+        deleteGoalKpi,
+        updateGoalLinkedEpics,
         createEpic,
         updateEpic,
         updateEpicWatchers,
@@ -410,8 +418,6 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         toggleSubtask,
         addComment,
         deleteComment,
-        addTimeEntry,
-        deleteTimeEntry,
       }}
     >
       {children}

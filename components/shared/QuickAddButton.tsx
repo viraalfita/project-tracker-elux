@@ -49,11 +49,14 @@ export function QuickAddButton({ contextEpicId }: QuickAddButtonProps) {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isOpen]);
 
-  // Check if user can create tasks
-  const canCreateTask = canCreate(currentUser, selectedEpicId);
+  // Check if user can create tasks in the currently selected epic
+  const selectedEpic = epics.find((e) => e.id === selectedEpicId);
+  const canCreateTask = canCreate(currentUser, selectedEpic?.memberIds);
 
-  // Filter epics user can create tasks in
-  const availableEpics = epics.filter((e) => canCreate(currentUser, e.id));
+  // Filter to epics the user is a member of (or all for Admin)
+  const availableEpics = epics.filter((e) =>
+    canCreate(currentUser, e.memberIds),
+  );
 
   function handleClose() {
     setIsOpen(false);

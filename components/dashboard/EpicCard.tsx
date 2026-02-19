@@ -32,8 +32,8 @@ export function EpicCard({ epic }: EpicCardProps) {
   const doneTasks = liveTasks.filter((t) => t.status === "Done").length;
   const progress = getEpicProgress(epic.id);
 
-  const allowEdit = canEdit(currentUser, epic.id);
-  const allowDelete = canDelete(currentUser, epic.id);
+  const allowEdit = canEdit(currentUser, epic.memberIds);
+  const allowDelete = canDelete(currentUser, epic.memberIds);
 
   function handleDelete() {
     deleteEpic(epic.id);

@@ -13,13 +13,13 @@ import { useState } from "react";
 interface CommentsSectionProps {
   taskId: string;
   comments: Comment[];
-  epicId?: string;
+  epicMemberIds?: string[];
 }
 
 export function CommentsSection({
   taskId,
   comments,
-  epicId,
+  epicMemberIds,
 }: CommentsSectionProps) {
   const { addComment, deleteComment } = useDataStore();
   const { toast } = useToast();
@@ -28,7 +28,7 @@ export function CommentsSection({
   const [draft, setDraft] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null);
 
-  const canPost = canComment(currentUser, epicId);
+  const canPost = canComment(currentUser, epicMemberIds);
 
   function handlePost() {
     if (!draft.trim() || !currentUser) return;
@@ -52,7 +52,7 @@ export function CommentsSection({
 
   function canDeleteComment(comment: Comment): boolean {
     // Admin can delete any; Member can delete their own in their epic
-    return canDelete(currentUser, epicId, comment.author.id);
+    return canDelete(currentUser, epicMemberIds, comment.author.id);
   }
 
   return (

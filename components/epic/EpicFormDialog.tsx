@@ -5,6 +5,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
 import { USERS } from "@/lib/mock";
+import { isAdmin } from "@/lib/permissions";
 import { Epic, EpicStatus, User } from "@/lib/types";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
@@ -36,6 +37,9 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
     epic?.status ?? "Not Started",
   );
   const [owner, setOwner] = useState<User | null>(epic?.owner ?? currentUser);
+  const [startDate, setStartDate] = useState(epic?.startDate ?? "");
+  const [endDate, setEndDate] = useState(epic?.endDate ?? "");
+  const [dateError, setDateError] = useState("");
 
   // Sync form when epic prop changes (switching between edit targets)
   useEffect(() => {
@@ -44,6 +48,9 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
       setDescription(epic?.description ?? "");
       setStatus(epic?.status ?? "Not Started");
       setOwner(epic?.owner ?? currentUser);
+      setStartDate(epic?.startDate ?? "");
+      setEndDate(epic?.endDate ?? "");
+      setDateError("");
     }
   }, [open, epic, currentUser]);
 
@@ -51,29 +58,42 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
     e.preventDefault();
     if (!title.trim() || !owner) return;
 
+    // Validate date range
+    if (startDate && endDate && endDate < startDate) {
+      setDateError("End Date cannot be earlier than Start Date.");
+      return;
+    }
+    setDateError("");
+
     if (isEdit && epic) {
       updateEpic(epic.id, {
         title: title.trim(),
         description: description.trim(),
         status,
         ownerId: owner.id,
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
       });
       toast(`Epic "${title.trim()}" updated.`);
     } else {
+      // Include currentUser as a member so they can access the epic they created
+      const creatorId = currentUser?.id ?? owner.id;
       createEpic({
         title: title.trim(),
         description: description.trim(),
         ownerId: owner.id,
         status,
-        memberIds: [owner.id],
+        memberIds: [...new Set([creatorId, owner.id])],
+        startDate: startDate || undefined,
+        endDate: endDate || undefined,
       });
       toast(`Epic "${title.trim()}" created.`);
     }
     onClose();
   }
 
-  // Only Admins can assign epics
-  const canAssign = currentUser?.role === "Admin";
+  // Only Admins can change the assigned owner; others are set as their own owner
+  const canAssign = isAdmin(currentUser);
 
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
@@ -151,6 +171,40 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
                 ))}
               </select>
             </div>
+
+            <div className="flex gap-3">
+              <div className="flex-1">
+                <label className="text-sm font-medium text-foreground block mb-1">
+                  Start Date
+                </label>
+                <input
+                  type="date"
+                  value={startDate}
+                  onChange={(e) => {
+                    setStartDate(e.target.value);
+                    setDateError("");
+                  }}
+                  className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+              <div className="flex-1">
+                <label className="text-sm font-medium text-foreground block mb-1">
+                  End Date
+                </label>
+                <input
+                  type="date"
+                  value={endDate}
+                  onChange={(e) => {
+                    setEndDate(e.target.value);
+                    setDateError("");
+                  }}
+                  className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+              </div>
+            </div>
+            {dateError && (
+              <p className="text-xs text-red-500 -mt-2">{dateError}</p>
+            )}
 
             <div className="flex gap-2 justify-end pt-2">
               <button

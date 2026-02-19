@@ -18,6 +18,7 @@ interface TaskFormDialogProps {
   open: boolean;
   onClose: () => void;
   epicId: string;
+  epicMemberIds: string[];
   /** When set, the dialog is in edit mode. */
   task?: Task;
 }
@@ -26,6 +27,7 @@ export function TaskFormDialog({
   open,
   onClose,
   epicId,
+  epicMemberIds,
   task,
 }: TaskFormDialogProps) {
   const { createTask, updateTask } = useDataStore();
@@ -42,8 +44,8 @@ export function TaskFormDialog({
   const [assignee, setAssignee] = useState<User | null>(task?.assignee ?? null);
 
   // Get assignable users based on permissions
-  const canAssign = canAssignTask(currentUser, epicId);
-  const assignableUserIds = getAssignableUsers(currentUser, epicId);
+  const canAssign = canAssignTask(currentUser, epicMemberIds);
+  const assignableUserIds = getAssignableUsers(currentUser, epicMemberIds);
   const assignableUsers = USERS.filter((u) => assignableUserIds.includes(u.id));
 
   useEffect(() => {

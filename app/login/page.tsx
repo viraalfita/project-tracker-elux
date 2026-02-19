@@ -7,12 +7,12 @@ import { FormEvent, useState } from "react";
 
 // Hardcoded fake credentials (in-memory only)
 const FAKE_CREDENTIALS: Record<string, { password: string; userId: string }> = {
-  admin: { password: "admin123", userId: "u1" },
-  manager: { password: "manager123", userId: "u2" },
-  dev1: { password: "dev123", userId: "u3" },
-  dev2: { password: "dev123", userId: "u4" },
-  designer: { password: "design123", userId: "u5" },
-  viewer: { password: "viewer123", userId: "u6" },
+  arya: { password: "admin123", userId: "u1" },
+  lintang: { password: "manager123", userId: "u2" },
+  dewi: { password: "manager123", userId: "u3" },
+  ahrasya: { password: "manager123", userId: "u4" },
+  vira: { password: "member123", userId: "u5" },
+  aurel: { password: "member123", userId: "u6" },
 };
 
 export default function LoginPage() {
@@ -152,7 +152,7 @@ export default function LoginPage() {
           <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
             <div>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                admin
+                arya
               </span>
               <span className="mx-1">/</span>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
@@ -161,7 +161,7 @@ export default function LoginPage() {
             </div>
             <div>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                manager
+                lintang
               </span>
               <span className="mx-1">/</span>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
@@ -170,38 +170,38 @@ export default function LoginPage() {
             </div>
             <div>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                dev1
+                dewi
               </span>
               <span className="mx-1">/</span>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                dev123
+                manager123
               </span>
             </div>
             <div>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                dev2
+                ahrasya
               </span>
               <span className="mx-1">/</span>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                dev123
+                manager123
               </span>
             </div>
             <div>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                designer
+                vira
               </span>
               <span className="mx-1">/</span>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                design123
+                member123
               </span>
             </div>
             <div>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                viewer
+                aurel
               </span>
               <span className="mx-1">/</span>
               <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-                viewer123
+                member123
               </span>
             </div>
           </div>

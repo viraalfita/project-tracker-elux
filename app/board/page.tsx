@@ -14,7 +14,8 @@ import { TaskCard } from "@/components/board/TaskCard";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { EPICS, USERS } from "@/lib/mock";
+import { USERS } from "@/lib/mock";
+import { isUserInvolvedInEpic } from "@/lib/permissions";
 import { Task, TaskStatus } from "@/lib/types";
 import { ChevronDown, Filter, Kanban, Users, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -23,9 +24,27 @@ const COLUMNS: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 const ALL_STATUSES: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 
 export default function BoardPage() {
-  const { tasks: initialTasks } = useDataStore();
+  const { tasks: initialTasks, epics: allEpics } = useDataStore();
   const [tasks, setTasks] = useState<Task[]>(initialTasks);
   const { currentUser } = useAuth();
+
+  // Epics the current user is allowed to see (Admin sees all; others see only
+  // epics they are owner / watcher / member of, or have a task assigned).
+  const visibleEpics = useMemo(
+    () =>
+      currentUser?.role === "Admin"
+        ? allEpics
+        : allEpics.filter(
+            (e) =>
+              currentUser && isUserInvolvedInEpic(e, currentUser.id, initialTasks),
+          ),
+    [allEpics, currentUser, initialTasks],
+  );
+
+  const visibleEpicIds = useMemo(
+    () => new Set(visibleEpics.map((e) => e.id)),
+    [visibleEpics],
+  );
 
   // ── Drag state ─────────────────────────────────────────────────────────────
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
@@ -105,7 +124,11 @@ export default function BoardPage() {
 
   const filteredTasks = useMemo(() => {
     const NOW = new Date("2026-02-10");
-    let result = tasks;
+    // Non-admin users only see tasks from epics they're involved in
+    let result =
+      currentUser?.role !== "Admin"
+        ? tasks.filter((t) => visibleEpicIds.has(t.epicId))
+        : tasks;
 
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -145,6 +168,8 @@ export default function BoardPage() {
     return result;
   }, [
     tasks,
+    currentUser,
+    visibleEpicIds,
     searchQuery,
     statusFilter,
     epicFilter,
@@ -222,7 +247,7 @@ export default function BoardPage() {
             className="rounded border border-border bg-white px-2.5 py-1.5 text-sm text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
           >
             <option value="">All Epics</option>
-            {EPICS.map((e) => (
+            {visibleEpics.map((e) => (
               <option key={e.id} value={e.id}>
                 {e.title}
               </option>

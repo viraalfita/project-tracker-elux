@@ -3,12 +3,8 @@
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { EPICS, getEpicProgress, USERS } from "@/lib/mock";
-import {
-  calculateUtilization,
-  calculateUtilizationAggregates,
-  downloadKpiCsv,
-} from "@/lib/utils";
+import { getEpicProgress, USERS } from "@/lib/mock";
+import { calculateTeamWorkload, downloadKpiCsv } from "@/lib/utils";
 import {
   AlertCircle,
   AlertTriangle,
@@ -58,21 +54,15 @@ export default function DashboardPage() {
     return t.status === "In Progress" && t.priority === "High";
   }).length;
 
-  // Utilization summary using shared calculation utility
-  // Uses all open tasks (no date range filter) for dashboard overview
-  const utilization = useMemo(
-    () =>
-      calculateUtilization(USERS, tasks, {
-        excludeCompleted: true,
-        dateRange: "none", // Dashboard shows all open work
-      }),
-    [tasks],
-  );
+  // Team Workload using idle resource model (In Progress task count)
+  const workload = useMemo(() => calculateTeamWorkload(USERS, tasks), [tasks]);
 
-  const { overCapacity, avgUtilization } = useMemo(
-    () => calculateUtilizationAggregates(utilization),
-    [utilization],
-  );
+  const overloadedCount = workload.filter(
+    (w) => w.status === "Overloaded",
+  ).length;
+  const availableCount = workload.filter(
+    (w) => w.status === "Available",
+  ).length;
 
   // Epic health (for EWS)
   const epicHealth = epics.map((epic) => {
@@ -97,8 +87,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="flex-1 px-6 py-6 space-y-6 overflow-auto">
-        {currentUser &&
-        (currentUser.role === "Admin" || currentUser.role === "Manager") ? (
+        {currentUser && currentUser.role === "Admin" ? (
           // ═══════════════════════════════════════════════════════════════════
           // MONITORING DASHBOARD (Admin / Manager)
           // ═══════════════════════════════════════════════════════════════════
@@ -111,7 +100,7 @@ export default function DashboardPage() {
                   Management Dashboard
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Monitoring & oversight — track health, utilisation, and key
+                  Monitoring &amp; oversight — track health, workload, and key
                   metrics
                 </p>
               </div>
@@ -133,7 +122,7 @@ export default function DashboardPage() {
                       className="rounded border border-border bg-white px-2.5 py-1 text-xs text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     >
                       <option value="">All Epics</option>
-                      {EPICS.map((e) => (
+                      {epics.map((e) => (
                         <option key={e.id} value={e.id}>
                           {e.title}
                         </option>
@@ -143,7 +132,7 @@ export default function DashboardPage() {
 
                   {/* Export KPI CSV button */}
                   <button
-                    onClick={() => downloadKpiCsv(kpiTasks, EPICS)}
+                    onClick={() => downloadKpiCsv(kpiTasks, epics)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 transition-colors"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -196,16 +185,14 @@ export default function DashboardPage() {
 
                 <div className="rounded-lg border border-border bg-white p-4">
                   <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs text-muted-foreground">
-                      Avg Utilisation
-                    </p>
-                    <UsersIcon className="h-4 w-4 text-indigo-500" />
+                    <p className="text-xs text-muted-foreground">Overloaded</p>
+                    <UsersIcon className="h-4 w-4 text-red-500" />
                   </div>
-                  <p className="text-3xl font-bold text-indigo-600">
-                    {avgUtilization}%
+                  <p className="text-3xl font-bold text-red-600">
+                    {overloadedCount}
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {overCapacity} over capacity
+                    {availableCount} available
                   </p>
                 </div>
               </div>
@@ -310,7 +297,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
                   <BarChart2 className="h-4 w-4 text-indigo-500" />
-                  Resource Utilisation
+                  Team Workload
                 </h2>
                 <Link
                   href="/utilization"
@@ -328,11 +315,8 @@ export default function DashboardPage() {
                         <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                           Team Member
                         </th>
-                        <th className="px-4 py-2 text-left text-xs font-semibold text-muted-foreground uppercase tracking-wide hidden sm:table-cell">
-                          Workload
-                        </th>
                         <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
-                          Utilisation
+                          In Progress
                         </th>
                         <th className="px-4 py-2 text-right text-xs font-semibold text-muted-foreground uppercase tracking-wide">
                           Status
@@ -340,24 +324,12 @@ export default function DashboardPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border">
-                      {utilization.map(({ user, totalEstimate, pct }) => {
-                        const barColor =
-                          pct > 100
-                            ? "bg-red-500"
-                            : pct >= 80
-                              ? "bg-amber-400"
-                              : "bg-green-500";
-                        const statusLabel =
-                          pct > 100
-                            ? "Over capacity"
-                            : pct >= 80
-                              ? "Near capacity"
-                              : "Available";
+                      {workload.map(({ user, activeTasks, status }) => {
                         const statusColor =
-                          pct > 100
+                          status === "Overloaded"
                             ? "text-red-600 bg-red-50 border-red-200"
-                            : pct >= 80
-                              ? "text-amber-600 bg-amber-50 border-amber-200"
+                            : status === "Balanced"
+                              ? "text-yellow-600 bg-yellow-50 border-yellow-200"
                               : "text-green-600 bg-green-50 border-green-200";
 
                         return (
@@ -378,32 +350,21 @@ export default function DashboardPage() {
                                     {user.name}
                                   </p>
                                   <p className="text-xs text-muted-foreground">
-                                    {user.role} · {user.weeklyCapacity}h/wk
+                                    {user.role}
                                   </p>
                                 </div>
                               </div>
                             </td>
-                            <td className="px-4 py-3 hidden sm:table-cell w-40">
-                              <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
-                                <div
-                                  className={`h-full rounded-full ${barColor} transition-all`}
-                                  style={{ width: `${Math.min(pct, 100)}%` }}
-                                />
-                              </div>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {totalEstimate}h assigned
-                              </p>
-                            </td>
                             <td className="px-4 py-3 text-right">
                               <span className="text-sm font-semibold text-foreground">
-                                {pct}%
+                                {activeTasks}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right">
                               <span
                                 className={`inline-block rounded-full border px-2 py-0.5 text-xs font-medium ${statusColor}`}
                               >
-                                {statusLabel}
+                                {status}
                               </span>
                             </td>
                           </tr>
@@ -455,10 +416,10 @@ export default function DashboardPage() {
                   className="rounded-lg border border-border bg-white p-4 hover:shadow-sm hover:border-indigo-300 transition-all"
                 >
                   <p className="text-sm font-medium text-foreground">
-                    Utilisation
+                    Team Workload
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    Team capacity
+                    Active tasks
                   </p>
                 </Link>
               </div>

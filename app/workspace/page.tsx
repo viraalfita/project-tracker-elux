@@ -69,7 +69,7 @@ export default function WorkspacePage() {
             >
               {/* Avatar */}
               <div
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
                 style={{ backgroundColor: user.avatarColor }}
               >
                 {user.name[0]}

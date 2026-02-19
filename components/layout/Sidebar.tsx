@@ -11,6 +11,7 @@ import {
   Kanban,
   LayoutDashboard,
   LogOut,
+  Target,
   Users,
 } from "lucide-react";
 import Link from "next/link";
@@ -25,12 +26,13 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/goals", label: "Goals", icon: Target },
   { href: "/epics", label: "Epics", icon: Folder },
   { href: "/board", label: "Board", icon: Kanban },
   { href: "/my-work", label: "My Work", icon: CheckSquare },
   {
     href: "/utilization",
-    label: "Utilization",
+    label: "Team Workload",
     icon: BarChart2,
     roles: ["Manager", "Admin"],
   },
@@ -44,7 +46,7 @@ const ROLE_BADGE: Record<Role, string> = {
   Viewer: "bg-slate-100 text-slate-600",
 };
 
-const ALL_ROLES: Role[] = ["Admin", "Manager", "Member", "Viewer"];
+const ALL_ROLES: Role[] = ["Admin", "Manager", "Member"];
 
 export function Sidebar() {
   const pathname = usePathname();

@@ -18,9 +18,14 @@ import { useState } from "react";
 interface EpicTasksTabProps {
   tasks: Task[];
   epicId: string;
+  epicMemberIds: string[];
 }
 
-export function EpicTasksTab({ tasks, epicId }: EpicTasksTabProps) {
+export function EpicTasksTab({
+  tasks,
+  epicId,
+  epicMemberIds,
+}: EpicTasksTabProps) {
   const { deleteTask } = useDataStore();
   const { toast } = useToast();
   const { currentUser } = useAuth();
@@ -29,7 +34,7 @@ export function EpicTasksTab({ tasks, epicId }: EpicTasksTabProps) {
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
 
-  const allowCreate = canCreate(currentUser, epicId);
+  const allowCreate = canCreate(currentUser, epicMemberIds);
 
   function handleDeleteConfirm() {
     if (!deleteTarget) return;
@@ -66,18 +71,8 @@ export function EpicTasksTab({ tasks, epicId }: EpicTasksTabProps) {
           {tasks.map((task) => {
             const progress = getTaskProgress(task);
             const doneSubtasks = task.subtasks.filter((s) => s.done).length;
-            const allowEditTask = canEdit(currentUser, epicId);
-            const allowDeleteTask = canDelete(currentUser, epicId);
-
-            // At Risk logic: time logged > 1.2x estimate
-            const totalMinutesLogged = task.timeEntries.reduce(
-              (acc, entry) => acc + entry.minutes,
-              0,
-            );
-            const totalHoursLogged = totalMinutesLogged / 60;
-            const estimateHours = task.estimate || 0;
-            const isOverBudget =
-              estimateHours > 0 && totalHoursLogged > estimateHours * 1.2;
+            const allowEditTask = canEdit(currentUser, epicMemberIds);
+            const allowDeleteTask = canDelete(currentUser, epicMemberIds);
 
             return (
               <div key={task.id} className="relative group/taskrow">
@@ -88,11 +83,6 @@ export function EpicTasksTab({ tasks, epicId }: EpicTasksTabProps) {
                         <span className="text-sm font-medium text-foreground group-hover:text-indigo-700 transition-colors truncate">
                           {task.title}
                         </span>
-                        {isOverBudget && (
-                          <span className="inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700 shrink-0">
-                            At Risk
-                          </span>
-                        )}
                         {!task.assignee && (
                           <span className="text-xs text-red-500 font-medium">
                             Unassigned
@@ -161,6 +151,7 @@ export function EpicTasksTab({ tasks, epicId }: EpicTasksTabProps) {
         open={showNew}
         onClose={() => setShowNew(false)}
         epicId={epicId}
+        epicMemberIds={epicMemberIds}
       />
 
       {/* Edit dialog */}
@@ -169,6 +160,7 @@ export function EpicTasksTab({ tasks, epicId }: EpicTasksTabProps) {
           open={!!editTask}
           onClose={() => setEditTask(null)}
           epicId={epicId}
+          epicMemberIds={epicMemberIds}
           task={editTask}
         />
       )}

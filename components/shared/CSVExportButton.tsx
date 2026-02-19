@@ -28,17 +28,6 @@ export function CSVExportButton({
     currentUser &&
     (currentUser.role === "Admin" || currentUser.role === "Manager");
 
-  function calculateCycleTime(task: Task): number | null {
-    // Find first "in progress" and "done" timestamps from task history
-    // For now, use a simplified calculation based on time entries
-    const doneEntry = task.timeEntries.find(() => task.status === "Done");
-    if (!doneEntry) return null;
-
-    // Calculate days between creation and completion (simplified)
-    // In real app, would use task_status_events table
-    return 5; // Placeholder
-  }
-
   function exportToCSV() {
     // Filter tasks based on selected criteria
     let filteredTasks = [...tasks];
@@ -81,34 +70,23 @@ export function CSVExportButton({
       "Task ID",
       "Title",
       "Epic",
-      "Project",
       "Assignee",
       "Status",
       "Priority",
-      "Estimate (hours)",
       "Due Date",
-      "Created At",
-      "Completed At",
-      "Cycle Time (days)",
     ];
 
     const rows = filteredTasks.map((task) => {
       const epic = EPICS.find((e) => e.id === task.epicId);
-      const cycleTime = calculateCycleTime(task);
 
       return [
         task.id,
         `"${task.title.replace(/"/g, '""')}"`, // Escape quotes
         epic?.title || "",
-        "", // Project placeholder
         task.assignee?.name || "Unassigned",
         task.status,
         task.priority,
-        task.estimate || "",
         task.dueDate,
-        "", // Created at placeholder
-        task.status === "Done" ? task.dueDate : "", // Simplified
-        cycleTime || "",
       ];
     });
 

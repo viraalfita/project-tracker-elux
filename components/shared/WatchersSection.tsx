@@ -2,21 +2,21 @@
 
 import { AvatarChip } from "@/components/shared/AvatarChip";
 import { useAuth } from "@/contexts/AuthContext";
-import { EPIC_MEMBERS, USERS } from "@/lib/mock";
-import { canManageWatchers } from "@/lib/permissions";
+import { USERS } from "@/lib/mock";
+import { canManageWatchers, isAdmin } from "@/lib/permissions";
 import { User } from "@/lib/types";
 import { Eye } from "lucide-react";
 import { useState } from "react";
 
 interface WatchersSectionProps {
   watchers: User[];
-  epicId: string;
+  epicMemberIds: string[];
   onUpdate: (watcherIds: string[]) => void;
 }
 
 export function WatchersSection({
   watchers,
-  epicId,
+  epicMemberIds,
   onUpdate,
 }: WatchersSectionProps) {
   const { currentUser } = useAuth();
@@ -25,11 +25,12 @@ export function WatchersSection({
     watchers.map((w) => w.id),
   );
 
-  // Only users who are members of the epic can be watchers
-  const epicMemberIds = EPIC_MEMBERS[epicId] || [];
-  const availableUsers = USERS.filter((u) => epicMemberIds.includes(u.id));
+  // Admin can watch/add any user; members can only add fellow epic members.
+  const availableUsers = isAdmin(currentUser)
+    ? USERS
+    : USERS.filter((u) => epicMemberIds.includes(u.id));
 
-  const canEdit = canManageWatchers(currentUser, epicId);
+  const canEdit = canManageWatchers(currentUser, epicMemberIds);
 
   function handleToggleUser(userId: string) {
     setSelectedUserIds((prev) =>

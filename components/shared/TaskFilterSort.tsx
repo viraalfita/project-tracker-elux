@@ -12,7 +12,6 @@ export interface TaskFilters {
   priorities: Priority[];
   epics: string[];
   overdue: boolean;
-  atRisk: boolean;
 }
 
 export interface TaskSort {
@@ -31,7 +30,6 @@ const DEFAULT_FILTERS: TaskFilters = {
   priorities: [],
   epics: [],
   overdue: false,
-  atRisk: false,
 };
 
 const DEFAULT_SORT: TaskSort = {
@@ -59,7 +57,6 @@ export function TaskFilterSort({
       (searchParams.get("priority")?.split(",") as Priority[]) || [];
     const epics = searchParams.get("epic")?.split(",") || [];
     const overdue = searchParams.get("overdue") === "true";
-    const atRisk = searchParams.get("atRisk") === "true";
     const sortField =
       (searchParams.get("sortBy") as TaskSort["field"]) || "dueDate";
     const sortDir =
@@ -71,7 +68,6 @@ export function TaskFilterSort({
       priorities,
       epics,
       overdue,
-      atRisk,
     });
 
     setSort({
@@ -110,18 +106,6 @@ export function TaskFilterSort({
       filtered = filtered.filter((t) => {
         const due = new Date(t.dueDate);
         return due < now && t.status !== "Done";
-      });
-    }
-
-    if (filters.atRisk) {
-      filtered = filtered.filter((t) => {
-        const totalMinutes = t.timeEntries.reduce(
-          (sum, e) => sum + e.minutes,
-          0,
-        );
-        const totalHours = totalMinutes / 60;
-        const estimate = t.estimate || 0;
-        return totalHours > estimate * 1.2 && t.status !== "Done";
       });
     }
 
@@ -190,9 +174,6 @@ export function TaskFilterSort({
     if (filters.overdue) {
       params.set("overdue", "true");
     }
-    if (filters.atRisk) {
-      params.set("atRisk", "true");
-    }
     params.set("sortBy", sort.field);
     params.set("sortDir", sort.direction);
 
@@ -214,8 +195,7 @@ export function TaskFilterSort({
     filters.statuses.length +
     filters.priorities.length +
     filters.epics.length +
-    (filters.overdue ? 1 : 0) +
-    (filters.atRisk ? 1 : 0);
+    (filters.overdue ? 1 : 0);
 
   function toggleArrayFilter<K extends keyof TaskFilters>(
     key: K,
@@ -383,20 +363,6 @@ export function TaskFilterSort({
                   className="rounded border-border text-indigo-600 focus:ring-indigo-500"
                 />
                 Overdue
-              </label>
-              <label className="flex items-center gap-2 text-xs text-foreground cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={filters.atRisk}
-                  onChange={(e) =>
-                    setFilters((prev) => ({
-                      ...prev,
-                      atRisk: e.target.checked,
-                    }))
-                  }
-                  className="rounded border-border text-indigo-600 focus:ring-indigo-500"
-                />
-                At Risk
               </label>
             </div>
 

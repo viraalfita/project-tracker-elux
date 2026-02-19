@@ -13,27 +13,12 @@ export function TaskRow({ task }: TaskRowProps) {
   const isOverdue =
     new Date(task.dueDate) < new Date("2026-02-10") && task.status !== "Done";
 
-  // At Risk logic: time logged > 1.2x estimate
-  const totalMinutesLogged = task.timeEntries.reduce(
-    (acc, entry) => acc + entry.minutes,
-    0,
-  );
-  const totalHoursLogged = totalMinutesLogged / 60;
-  const estimateHours = task.estimate || 0;
-  const isOverBudget =
-    estimateHours > 0 && totalHoursLogged > estimateHours * 1.2;
-
   return (
     <Link href={`/task/${task.id}`}>
       <div className="group flex items-center gap-4 rounded-lg border border-border bg-white px-4 py-3 hover:border-indigo-200 hover:shadow-sm transition-all cursor-pointer">
         <div className="min-w-0 flex-1">
           <p className="text-sm font-medium text-foreground group-hover:text-indigo-700 transition-colors truncate">
             {task.title}
-            {isOverBudget && (
-              <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-                At Risk
-              </span>
-            )}
           </p>
           {epic && (
             <span className="text-xs text-indigo-500 bg-indigo-50 rounded px-1.5 py-0.5 mt-1 inline-block">

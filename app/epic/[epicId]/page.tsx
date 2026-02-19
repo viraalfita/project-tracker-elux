@@ -6,7 +6,7 @@ import { EpicTasksTab } from "@/components/epic/EpicTasksTab";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { canViewEpic } from "@/lib/permissions";
+import { isUserInvolvedInEpic } from "@/lib/permissions";
 import { notFound } from "next/navigation";
 import { use, useState } from "react";
 
@@ -24,8 +24,11 @@ export default function EpicPage({ params }: EpicPageProps) {
   const epic = epics.find((e) => e.id === epicId);
   if (!epic) notFound();
 
-  // Authorization check: ensure user can view this epic
-  if (!canViewEpic(currentUser, epic.id)) {
+  // Authorization check: ensure user is involved in the epic (or Admin)
+  if (
+    currentUser?.role !== "Admin" &&
+    (!currentUser || !isUserInvolvedInEpic(epic, currentUser.id, tasks))
+  ) {
     notFound(); // Return 404 for unauthorized access (security best practice)
   }
 
@@ -78,7 +81,11 @@ export default function EpicPage({ params }: EpicPageProps) {
 
         {/* Tab content */}
         {activeTab === "tasks" && (
-          <EpicTasksTab tasks={epicTasks} epicId={epic.id} />
+          <EpicTasksTab
+            tasks={epicTasks}
+            epicId={epic.id}
+            epicMemberIds={epic.memberIds}
+          />
         )}
         {activeTab === "docs" && <EpicDocsTab />}
       </div>

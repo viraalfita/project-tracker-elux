@@ -21,10 +21,14 @@ import { useState } from "react";
 interface SubtaskListProps {
   taskId: string;
   subtasks: Subtask[];
-  epicId?: string;
+  epicMemberIds?: string[];
 }
 
-export function SubtaskList({ taskId, subtasks, epicId }: SubtaskListProps) {
+export function SubtaskList({
+  taskId,
+  subtasks,
+  epicMemberIds,
+}: SubtaskListProps) {
   const { createSubtask, deleteSubtask, toggleSubtask } = useDataStore();
   const { toast } = useToast();
   const { currentUser } = useAuth();
@@ -34,11 +38,14 @@ export function SubtaskList({ taskId, subtasks, epicId }: SubtaskListProps) {
   const [newAssignee, setNewAssignee] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Subtask | null>(null);
 
-  const allowCreate = canCreate(currentUser, epicId);
-  const allowDelete = canDelete(currentUser, epicId);
+  const allowCreate = canCreate(currentUser, epicMemberIds);
+  const allowDelete = canDelete(currentUser, epicMemberIds);
   const allowToggle = allowCreate;
-  const canAssign = canAssignTask(currentUser, epicId);
-  const assignableUserIds = getAssignableUsers(currentUser, epicId ?? "");
+  const canAssign = canAssignTask(currentUser, epicMemberIds);
+  const assignableUserIds = getAssignableUsers(
+    currentUser,
+    epicMemberIds ?? [],
+  );
   const assignableUsers = USERS.filter((u) => assignableUserIds.includes(u.id));
 
   const doneCount = subtasks.filter((s) => s.done).length;

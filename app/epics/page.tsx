@@ -6,19 +6,25 @@ import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { canManageEpics, canViewEpic } from "@/lib/permissions";
+import { canManageEpics, isUserInvolvedInEpic } from "@/lib/permissions";
 import { Folder, Plus } from "lucide-react";
 import { useState } from "react";
 
 export default function EpicsPage() {
-  const { epics } = useDataStore();
+  const { epics, tasks } = useDataStore();
   const { currentUser } = useAuth();
   const [showNewEpic, setShowNewEpic] = useState(false);
 
-  // Filter epics based on permissions (Members/Viewers see only assigned epics)
-  const visibleEpics = epics.filter((e) => canViewEpic(currentUser, e.id));
+  // Filter epics based on involvement: Admin sees all; everyone else only sees
+  // epics they are owner/watcher/member of, or have a task/subtask assigned.
+  const visibleEpics =
+    currentUser?.role === "Admin"
+      ? epics
+      : epics.filter(
+          (e) => currentUser && isUserInvolvedInEpic(e, currentUser.id, tasks),
+        );
 
-  // Epic creation is Admin-only (workspace-level management)
+  // Any logged-in user can create an Epic (they become owner + member + watcher)
   const allowNewEpic = canManageEpics(currentUser);
 
   return (

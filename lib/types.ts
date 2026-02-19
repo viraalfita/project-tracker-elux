@@ -57,18 +57,7 @@ export interface Subtask {
   done: boolean;
   assignee?: User;
   dueDate?: string;
-  estimate?: number; // hours
   status?: TaskStatus;
-}
-
-export interface TimeEntry {
-  id: string;
-  taskId: string;
-  subtaskId?: string; // Optional: link to specific subtask
-  user: User;
-  date: string;
-  minutes: number;
-  note?: string;
 }
 
 export interface Task {
@@ -86,7 +75,6 @@ export interface Task {
   estimate?: number;
   subtasks: Subtask[];
   comments: Comment[];
-  timeEntries: TimeEntry[];
   attachments: Attachment[];
   externalLinks: ExternalLink[];
 }
@@ -102,4 +90,25 @@ export interface Epic {
   startDate?: string;
   endDate?: string;
   memberIds: string[];
+}
+
+export type GoalStatus = "On Track" | "At Risk" | "Completed";
+
+export interface GoalKpi {
+  id: string;
+  label: string;
+  target: number;
+  current: number;
+  unit: string;
+  greenThreshold: number; // % of target — status is On Track when (current/target)*100 >= this
+  yellowThreshold: number; // % of target — status is At Risk when (current/target)*100 >= this
+}
+
+export interface Goal {
+  id: string;
+  title: string;
+  description: string;
+  owner: User;
+  kpis: GoalKpi[];
+  linkedEpicIds: string[];
 }

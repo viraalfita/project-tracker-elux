@@ -22,16 +22,6 @@ export function TaskCard({ task, canDragDrop }: TaskCardProps) {
     disabled: !canDragDrop,
   });
 
-  // At Risk logic: time logged > 1.2x estimate
-  const totalMinutesLogged = task.timeEntries.reduce(
-    (acc, entry) => acc + entry.minutes,
-    0,
-  );
-  const totalHoursLogged = totalMinutesLogged / 60;
-  const estimateHours = task.estimate || 0;
-  const isOverBudget =
-    estimateHours > 0 && totalHoursLogged > estimateHours * 1.2;
-
   return (
     <div
       ref={setNodeRef}
@@ -55,11 +45,6 @@ export function TaskCard({ task, canDragDrop }: TaskCardProps) {
       >
         <p className="text-sm font-medium text-foreground mb-2 leading-snug group-hover:text-indigo-700 transition-colors cursor-pointer">
           {task.title}
-          {isOverBudget && (
-            <span className="ml-2 inline-flex items-center rounded-full bg-red-100 px-2 py-0.5 text-xs font-medium text-red-700">
-              At Risk
-            </span>
-          )}
         </p>
       </Link>
 

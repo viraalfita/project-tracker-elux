@@ -9,7 +9,6 @@ import { WatchersSection } from "@/components/shared/WatchersSection";
 import { AttachmentsSection } from "@/components/task/AttachmentsSection";
 import { CommentsSection } from "@/components/task/CommentsSection";
 import { ExternalLinksSection } from "@/components/task/ExternalLinksSection";
-import { LogTimeDialog } from "@/components/task/LogTimeDialog";
 import { SubtaskList } from "@/components/task/SubtaskList";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
@@ -21,7 +20,7 @@ import {
   getAssignableUsers,
 } from "@/lib/permissions";
 import { TaskStatus, User } from "@/lib/types";
-import { AlertTriangle, CalendarDays, Clock, Trash2 } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 import { notFound } from "next/navigation";
 import { use, useEffect, useState } from "react";
 
@@ -33,8 +32,7 @@ interface TaskPageProps {
 
 export default function TaskPage({ params }: TaskPageProps) {
   const { taskId } = use(params);
-  const { tasks, epics, updateTask, updateTaskWatchers, deleteTimeEntry } =
-    useDataStore();
+  const { tasks, epics, updateTask, updateTaskWatchers } = useDataStore();
   const { currentUser } = useAuth();
 
   const task = tasks.find((t) => t.id === taskId);
@@ -42,39 +40,18 @@ export default function TaskPage({ params }: TaskPageProps) {
 
   const epic = epics.find((e) => e.id === task.epicId);
 
-  // Authorization check: ensure user can view this epic/task
-  if (epic && !canViewEpic(currentUser, epic.id)) {
+  // Authorization check: ensure user is an epic member (or Admin)
+  if (epic && !canViewEpic(currentUser, epic.memberIds)) {
     notFound(); // Return 404 for unauthorized access (security best practice)
   }
 
   const [status, setStatus] = useState<TaskStatus>(task.status);
   const [assignee, setAssignee] = useState<User | null>(task.assignee);
-  const [showLogTime, setShowLogTime] = useState(false);
 
-  const canEditStatus = canUpdateStatus(currentUser, epic?.id);
-  const canAssign = canAssignTask(currentUser, epic?.id);
-  const assignableUserIds = getAssignableUsers(currentUser, epic?.id ?? "");
+  const canEditStatus = canUpdateStatus(currentUser, epic?.memberIds);
+  const canAssign = canAssignTask(currentUser, epic?.memberIds);
+  const assignableUserIds = getAssignableUsers(currentUser, epic?.memberIds ?? []);
   const assignableUsers = USERS.filter((u) => assignableUserIds.includes(u.id));
-
-  // Time tracking calculations
-  const totalMinutesLogged = task.timeEntries.reduce(
-    (sum, entry) => sum + entry.minutes,
-    0,
-  );
-  const totalHoursLogged = totalMinutesLogged / 60;
-  const estimateHours = task.estimate || 0;
-  const remainingHours = estimateHours - totalHoursLogged;
-
-  // At Risk logic: time logged > estimate * 1.2
-  const isOverBudget = totalHoursLogged > estimateHours * 1.2;
-
-  // Permission to log time: Admin can always, Members can if they have access
-  const canLogTime =
-    currentUser &&
-    (currentUser.role === "Admin" ||
-      (currentUser.role === "Member" &&
-        epic &&
-        canViewEpic(currentUser, epic.id)));
 
   // Check for overdue and notify watchers (MVP: on page load)
   useEffect(() => {
@@ -98,12 +75,6 @@ export default function TaskPage({ params }: TaskPageProps) {
   function handleAssigneeChange(newAssignee: User | null) {
     setAssignee(newAssignee);
     if (task) updateTask(task.id, { assigneeId: newAssignee?.id });
-  }
-
-  function handleDeleteTimeEntry(entryId: string) {
-    if (task && confirm("Delete this time entry?")) {
-      deleteTimeEntry(task.id, entryId);
-    }
   }
 
   return (
@@ -130,12 +101,6 @@ export default function TaskPage({ params }: TaskPageProps) {
                   <h1 className="text-xl font-bold text-foreground leading-tight">
                     {task.title}
                   </h1>
-                  {isOverBudget && (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2.5 py-0.5 text-xs font-medium text-red-700 border border-red-200">
-                      <AlertTriangle className="h-3 w-3" />
-                      At Risk
-                    </span>
-                  )}
                 </div>
               </div>
               {/* Status selector — disabled for read-only roles */}
@@ -209,19 +174,6 @@ export default function TaskPage({ params }: TaskPageProps) {
                 </span>
               </div>
 
-              {/* Estimate */}
-              {task.estimate && (
-                <div className="flex flex-col gap-1">
-                  <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-                    Estimate
-                  </span>
-                  <span className="flex items-center gap-1.5 text-sm text-foreground">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    {task.estimate}h
-                  </span>
-                </div>
-              )}
-
               {/* Epic */}
               {epic && (
                 <div className="flex flex-col gap-1">
@@ -239,144 +191,12 @@ export default function TaskPage({ params }: TaskPageProps) {
                 <div className="flex flex-col gap-1 min-w-[220px]">
                   <WatchersSection
                     watchers={task.watchers}
-                    epicId={epic.id}
+                    epicMemberIds={epic.memberIds}
                     onUpdate={updateTaskWatchers.bind(null, task.id)}
                   />
                 </div>
               )}
             </div>
-          </div>
-
-          {/* Time Tracking */}
-          <div className="rounded-lg border border-border bg-white p-6">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold text-foreground">
-                Time Tracking
-              </h2>
-              {canLogTime && (
-                <button
-                  onClick={() => setShowLogTime(true)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-indigo-600 text-white text-sm font-medium hover:bg-indigo-700 transition-colors"
-                >
-                  <Clock className="h-4 w-4" />
-                  Log Time
-                </button>
-              )}
-            </div>
-
-            {/* Time Summary */}
-            <div className="grid grid-cols-3 gap-4 mb-4">
-              <div className="p-3 rounded-lg bg-slate-50">
-                <p className="text-xs text-muted-foreground mb-1">Estimate</p>
-                <p className="text-lg font-semibold text-foreground">
-                  {estimateHours.toFixed(1)}h
-                </p>
-              </div>
-              <div className="p-3 rounded-lg bg-blue-50">
-                <p className="text-xs text-muted-foreground mb-1">
-                  Time Logged
-                </p>
-                <p className="text-lg font-semibold text-blue-700">
-                  {totalHoursLogged.toFixed(1)}h
-                </p>
-              </div>
-              <div
-                className={`p-3 rounded-lg ${remainingHours < 0 ? "bg-red-50" : "bg-green-50"}`}
-              >
-                <p className="text-xs text-muted-foreground mb-1">Remaining</p>
-                <p
-                  className={`text-lg font-semibold ${remainingHours < 0 ? "text-red-700" : "text-green-700"}`}
-                >
-                  {remainingHours.toFixed(1)}h
-                </p>
-              </div>
-            </div>
-
-            {/* Time Entries List */}
-            {task.timeEntries.length > 0 ? (
-              <div className="space-y-2">
-                <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium mb-2">
-                  Time Entries
-                </p>
-                {task.timeEntries
-                  .slice()
-                  .sort(
-                    (a, b) =>
-                      new Date(b.date).getTime() - new Date(a.date).getTime(),
-                  )
-                  .map((entry) => {
-                    const hours = Math.floor(entry.minutes / 60);
-                    const mins = entry.minutes % 60;
-                    const canDelete =
-                      currentUser &&
-                      (currentUser.role === "Admin" ||
-                        entry.user.id === currentUser.id);
-
-                    // Find subtask if entry is linked to one
-                    const subtask = entry.subtaskId
-                      ? task.subtasks.find((s) => s.id === entry.subtaskId)
-                      : null;
-
-                    return (
-                      <div
-                        key={entry.id}
-                        className="flex items-start justify-between p-3 rounded-lg border border-border bg-white hover:bg-slate-50 transition-colors"
-                      >
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2 mb-1">
-                            <span
-                              className="inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-medium text-white flex-shrink-0"
-                              style={{
-                                backgroundColor: entry.user.avatarColor,
-                              }}
-                            >
-                              {entry.user.initials}
-                            </span>
-                            <span className="text-sm font-medium text-foreground">
-                              {entry.user.name}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {entry.date}
-                            </span>
-                          </div>
-                          {subtask && (
-                            <div className="ml-8 mb-1">
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-purple-100 text-purple-700 border border-purple-200">
-                                <span className="font-semibold">Subtask:</span>
-                                {subtask.title}
-                              </span>
-                            </div>
-                          )}
-                          <div className="flex items-center gap-3 ml-8">
-                            <span className="text-sm font-semibold text-indigo-600">
-                              {hours > 0 && `${hours}h `}
-                              {mins > 0 && `${mins}m`}
-                            </span>
-                            {entry.note && (
-                              <span className="text-sm text-muted-foreground">
-                                {entry.note}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                        {canDelete && (
-                          <button
-                            onClick={() => handleDeleteTimeEntry(entry.id)}
-                            className="text-muted-foreground hover:text-red-600 transition-colors p-1"
-                            title="Delete time entry"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </button>
-                        )}
-                      </div>
-                    );
-                  })}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground text-center py-4">
-                No time logged yet
-              </p>
-            )}
           </div>
 
           {/* Description */}
@@ -394,7 +214,7 @@ export default function TaskPage({ params }: TaskPageProps) {
             <SubtaskList
               taskId={task.id}
               subtasks={task.subtasks}
-              epicId={epic?.id}
+              epicMemberIds={epic?.memberIds}
             />
           </div>
 
@@ -403,7 +223,7 @@ export default function TaskPage({ params }: TaskPageProps) {
             <CommentsSection
               taskId={task.id}
               comments={task.comments}
-              epicId={epic?.id}
+              epicMemberIds={epic?.memberIds}
             />
           </div>
 
@@ -427,10 +247,6 @@ export default function TaskPage({ params }: TaskPageProps) {
         </div>
       </div>
 
-      {/* Log Time Dialog */}
-      {showLogTime && (
-        <LogTimeDialog taskId={task.id} onClose={() => setShowLogTime(false)} />
-      )}
     </div>
   );
 }
