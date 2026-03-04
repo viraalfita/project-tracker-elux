@@ -1,12 +1,10 @@
 "use client";
 
-import { UserSelect } from "@/components/shared/UserSelect";
+import { AvatarChip } from "@/components/shared/AvatarChip";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
-import { USERS } from "@/lib/mock";
-import { isAdmin } from "@/lib/permissions";
-import { Epic, EpicStatus, User } from "@/lib/types";
+import { Epic, EpicStatus } from "@/lib/types";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -31,12 +29,15 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
   const { currentUser } = useAuth();
 
   const isEdit = !!epic;
+  // Owner is always the creator (on create) or the existing owner (on edit).
+  // Ownership is permanent and cannot be changed after creation.
+  const displayOwner = epic?.owner ?? currentUser;
+
   const [title, setTitle] = useState(epic?.title ?? "");
   const [description, setDescription] = useState(epic?.description ?? "");
   const [status, setStatus] = useState<EpicStatus>(
     epic?.status ?? "Not Started",
   );
-  const [owner, setOwner] = useState<User | null>(epic?.owner ?? currentUser);
   const [startDate, setStartDate] = useState(epic?.startDate ?? "");
   const [endDate, setEndDate] = useState(epic?.endDate ?? "");
   const [dateError, setDateError] = useState("");
@@ -47,16 +48,15 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
       setTitle(epic?.title ?? "");
       setDescription(epic?.description ?? "");
       setStatus(epic?.status ?? "Not Started");
-      setOwner(epic?.owner ?? currentUser);
       setStartDate(epic?.startDate ?? "");
       setEndDate(epic?.endDate ?? "");
       setDateError("");
     }
-  }, [open, epic, currentUser]);
+  }, [open, epic]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !owner) return;
+    if (!title.trim() || !currentUser) return;
 
     // Validate date range
     if (startDate && endDate && endDate < startDate) {
@@ -70,20 +70,16 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
         title: title.trim(),
         description: description.trim(),
         status,
-        ownerId: owner.id,
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       });
       toast(`Epic "${title.trim()}" updated.`);
     } else {
-      // Include currentUser as a member so they can access the epic they created
-      const creatorId = currentUser?.id ?? owner.id;
       createEpic({
         title: title.trim(),
         description: description.trim(),
-        ownerId: owner.id,
+        ownerId: currentUser.id,
         status,
-        memberIds: [...new Set([creatorId, owner.id])],
         startDate: startDate || undefined,
         endDate: endDate || undefined,
       });
@@ -91,9 +87,6 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
     }
     onClose();
   }
-
-  // Only Admins can change the assigned owner; others are set as their own owner
-  const canAssign = isAdmin(currentUser);
 
   return (
     <Dialog.Root open={open} onOpenChange={(v) => !v && onClose()}>
@@ -143,16 +136,15 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
 
             <div>
               <label className="text-sm font-medium text-foreground block mb-1">
-                Owner <span className="text-red-500">*</span>
+                Owner
               </label>
-              <UserSelect
-                users={USERS}
-                value={owner}
-                onChange={setOwner}
-                placeholder="Select owner..."
-                disabled={!canAssign}
-                allowUnassigned={false}
-              />
+              <div className="flex items-center gap-2 px-3 py-2 rounded-md border border-border bg-slate-50">
+                {displayOwner ? (
+                  <AvatarChip user={displayOwner} size="sm" showName />
+                ) : (
+                  <span className="text-sm text-muted-foreground">—</span>
+                )}
+              </div>
             </div>
 
             <div>
@@ -216,7 +208,7 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
               </button>
               <button
                 type="submit"
-                disabled={!title.trim() || !owner}
+                disabled={!title.trim()}
                 className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
                 {isEdit ? "Save Changes" : "Create Epic"}

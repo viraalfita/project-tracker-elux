@@ -3,19 +3,28 @@
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { getEpicHealthIndicators } from "@/lib/mock";
-import { Epic, Goal, GoalStatus } from "@/lib/types";
+import { Epic, Goal, GoalStatus, Task } from "@/lib/types";
 import { AlertTriangle, CheckCircle2, Target, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
-function deriveGoalStatus(goal: Goal, epics: Epic[]): GoalStatus {
+const NOW = new Date("2026-02-10");
+
+function epicIsAtRisk(epic: Epic, tasks: Task[]): boolean {
+  const epicTasks = tasks.filter((t) => t.epicId === epic.id);
+  const overdueCount = epicTasks.filter(
+    (t) => new Date(t.dueDate) < NOW && t.status !== "Done"
+  ).length;
+  const atRiskCount = epicTasks.filter(
+    (t) => t.status === "In Progress" && t.priority === "High"
+  ).length;
+  return overdueCount > 0 || atRiskCount > 0;
+}
+
+function deriveGoalStatus(goal: Goal, epics: Epic[], tasks: Task[]): GoalStatus {
   const linked = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
   if (linked.length === 0) return "On Track";
   if (linked.every((e) => e.status === "Done")) return "Completed";
-  const anyAtRisk = linked.some((epic) => {
-    const { overdueCount, atRiskCount } = getEpicHealthIndicators(epic.id);
-    return overdueCount > 0 || atRiskCount > 0;
-  });
+  const anyAtRisk = linked.some((epic) => epicIsAtRisk(epic, tasks));
   return anyAtRisk ? "At Risk" : "On Track";
 }
 
@@ -32,7 +41,7 @@ const STATUS_ICONS: Record<GoalStatus, React.ElementType> = {
 };
 
 export default function GoalsPage() {
-  const { goals, epics } = useDataStore();
+  const { goals, epics, tasks } = useDataStore();
   const { currentUser } = useAuth();
 
   if (!currentUser) return null;
@@ -69,7 +78,7 @@ export default function GoalsPage() {
           ) : (
             <div className="space-y-3">
               {goals.map((goal) => {
-                const status = deriveGoalStatus(goal, epics);
+                const status = deriveGoalStatus(goal, epics, tasks);
                 const StatusIcon = STATUS_ICONS[status];
                 const linkedEpics = epics.filter((e) =>
                   goal.linkedEpicIds.includes(e.id),

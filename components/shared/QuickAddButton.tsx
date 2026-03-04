@@ -51,12 +51,10 @@ export function QuickAddButton({ contextEpicId }: QuickAddButtonProps) {
 
   // Check if user can create tasks in the currently selected epic
   const selectedEpic = epics.find((e) => e.id === selectedEpicId);
-  const canCreateTask = canCreate(currentUser, selectedEpic?.memberIds);
+  const canCreateTask = canCreate(currentUser, selectedEpic);
 
-  // Filter to epics the user is a member of (or all for Admin)
-  const availableEpics = epics.filter((e) =>
-    canCreate(currentUser, e.memberIds),
-  );
+  // Filter to epics the user can access (owner, watcher, or Admin)
+  const availableEpics = epics.filter((e) => canCreate(currentUser, e));
 
   function handleClose() {
     setIsOpen(false);

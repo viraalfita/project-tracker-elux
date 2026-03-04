@@ -2,8 +2,9 @@
 
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
-import { USERS } from "@/lib/mock";
-import { Role } from "@/lib/types";
+import { useDataStore } from "@/contexts/DataStore";
+import { pb } from "@/lib/pocketbase";
+import { Role, User } from "@/lib/types";
 import { Shield, UserPlus, Users, X } from "lucide-react";
 import { FormEvent, useState } from "react";
 
@@ -14,12 +15,33 @@ const ROLE_BADGE: Record<string, string> = {
   Viewer: "bg-slate-100 text-slate-600",
 };
 
+const AVATAR_COLORS = [
+  "#6366f1",
+  "#8b5cf6",
+  "#ec4899",
+  "#14b8a6",
+  "#f59e0b",
+  "#10b981",
+  "#3b82f6",
+  "#ef4444",
+];
+
+function deriveInitials(name: string): string {
+  return name
+    .split(" ")
+    .map((w) => w[0]?.toUpperCase() ?? "")
+    .slice(0, 2)
+    .join("");
+}
+
 export default function WorkspacePage() {
   const { currentUser } = useAuth();
+  const { users, refreshUsers } = useDataStore();
   const [showAddUser, setShowAddUser] = useState(false);
   const [showAccessManagement, setShowAccessManagement] = useState(false);
 
   const isAdmin = currentUser?.role === "Admin";
+
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-border bg-white px-6 py-4">
@@ -40,7 +62,6 @@ export default function WorkspacePage() {
             </h1>
           </div>
 
-          {/* Admin Actions */}
           {isAdmin && (
             <div className="flex gap-2">
               <button
@@ -62,20 +83,17 @@ export default function WorkspacePage() {
         </div>
 
         <div className="max-w-lg space-y-2">
-          {USERS.map((user) => (
+          {users.map((user) => (
             <div
               key={user.id}
               className="flex items-center gap-3 rounded-lg border border-border bg-white px-4 py-3"
             >
-              {/* Avatar */}
               <div
                 className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-semibold text-white"
                 style={{ backgroundColor: user.avatarColor }}
               >
-                {user.name[0]}
+                {user.initials}
               </div>
-
-              {/* User Info */}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-foreground truncate">
                   {user.name}
@@ -84,8 +102,6 @@ export default function WorkspacePage() {
                   {user.email}
                 </p>
               </div>
-
-              {/* Role Badge */}
               <span
                 className={`px-2 py-1 rounded text-xs font-medium ${ROLE_BADGE[user.role]}`}
               >
@@ -102,13 +118,19 @@ export default function WorkspacePage() {
         )}
       </div>
 
-      {/* Add User Dialog */}
-      {showAddUser && <AddUserDialog onClose={() => setShowAddUser(false)} />}
+      {showAddUser && (
+        <AddUserDialog
+          onClose={() => setShowAddUser(false)}
+          refreshUsers={refreshUsers}
+        />
+      )}
 
-      {/* Access Management Dialog */}
       {showAccessManagement && (
         <AccessManagementDialog
+          users={users}
+          currentUserId={currentUser?.id ?? ""}
           onClose={() => setShowAccessManagement(false)}
+          refreshUsers={refreshUsers}
         />
       )}
     </div>
@@ -119,30 +141,61 @@ export default function WorkspacePage() {
 // ADD USER DIALOG
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function AddUserDialog({ onClose }: { onClose: () => void }) {
+function AddUserDialog({
+  onClose,
+  refreshUsers,
+}: {
+  onClose: () => void;
+  refreshUsers: () => Promise<void>;
+}) {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("Member");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setIsSubmitting(true);
+    setError(null);
 
-    // Simulate API call
-    setTimeout(() => {
-      alert(
-        `User invitation sent!\n\nName: ${name}\nEmail: ${email}\nRole: ${role}\n\nNote: This is a demo. In production, this would send an email invitation.`,
-      );
-      setIsSubmitting(false);
+    const initials = deriveInitials(name);
+    const avatarColor =
+      AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+    const password = "devPassword123!";
+
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${pb.authStore.token}`,
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          name,
+          initials,
+          avatarColor,
+          role,
+          weeklyCapacity: 40,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to create user");
+      await refreshUsers();
       onClose();
-    }, 1000);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to create user";
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-indigo-600" />
@@ -158,8 +211,13 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
+          {error && (
+            <div className="rounded-md bg-red-50 border border-red-200 p-3">
+              <p className="text-sm text-red-700">{error}</p>
+            </div>
+          )}
+
           <div>
             <label
               htmlFor="name"
@@ -209,27 +267,20 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
               onChange={(e) => setRole(e.target.value as Role)}
               className="w-full px-3 py-2 rounded-md border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
             >
-              <option value="Member">Member - Can create and edit tasks</option>
+              <option value="Member">Member — Can create and edit tasks</option>
               <option value="Manager">
-                Manager - Can manage team and review
+                Manager — Can manage team and review
               </option>
-              <option value="Admin">Admin - Full control</option>
-              <option value="Viewer">Viewer - Read-only access</option>
+              <option value="Admin">Admin — Full control</option>
+              <option value="Viewer">Viewer — Read-only access</option>
             </select>
             <p className="text-xs text-muted-foreground mt-1">
-              Role can be changed later in Access Management
+              Default password:{" "}
+              <code className="bg-slate-100 px-1 rounded">devPassword123!</code>{" "}
+              — user should change it on first login.
             </p>
           </div>
 
-          <div className="rounded-md bg-blue-50 border border-blue-200 p-3">
-            <p className="text-sm text-blue-900">
-              An invitation email will be sent to{" "}
-              <strong>{email || "the user"}</strong> with instructions to join
-              the workspace.
-            </p>
-          </div>
-
-          {/* Actions */}
           <div className="flex gap-2 pt-2">
             <button
               type="button"
@@ -244,7 +295,7 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
               disabled={isSubmitting}
               className="flex-1 px-4 py-2 rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50"
             >
-              {isSubmitting ? "Sending..." : "Send Invitation"}
+              {isSubmitting ? "Creating..." : "Create User"}
             </button>
           </div>
         </form>
@@ -257,38 +308,74 @@ function AddUserDialog({ onClose }: { onClose: () => void }) {
 // ACCESS MANAGEMENT DIALOG
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-function AccessManagementDialog({ onClose }: { onClose: () => void }) {
-  const [users, setUsers] = useState(USERS);
+function AccessManagementDialog({
+  users,
+  currentUserId,
+  onClose,
+  refreshUsers,
+}: {
+  users: User[];
+  currentUserId: string;
+  onClose: () => void;
+  refreshUsers: () => Promise<void>;
+}) {
+  const [error, setError] = useState<string | null>(null);
 
-  function handleRoleChange(userId: string, newRole: Role) {
-    setUsers((prev) =>
-      prev.map((u) => (u.id === userId ? { ...u, role: newRole } : u)),
-    );
-    alert(
-      `Role updated for user ${userId} to ${newRole}\n\nNote: This is a demo. In production, this would update the database.`,
-    );
+  async function handleRoleChange(userId: string, newRole: Role) {
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${pb.authStore.token}`,
+        },
+        body: JSON.stringify({ userId, role: newRole }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to update role");
+      await refreshUsers();
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to update role";
+      setError(msg);
+    }
   }
 
-  function handleRevokeAccess(userId: string) {
+  async function handleRevokeAccess(userId: string) {
     const user = users.find((u) => u.id === userId);
     if (!user) return;
 
-    const confirmed = confirm(
-      `Are you sure you want to revoke access for ${user.name}?\n\nThey will be immediately removed from the workspace and lose all access.`,
-    );
+    if (
+      !confirm(
+        `Revoke access for ${user.name}? They will lose all workspace access immediately.`,
+      )
+    ) {
+      return;
+    }
 
-    if (confirmed) {
-      setUsers((prev) => prev.filter((u) => u.id !== userId));
-      alert(
-        `Access revoked for ${user.name}\n\nNote: This is a demo. In production, this would update the database.`,
-      );
+    setError(null);
+    try {
+      const res = await fetch("/api/admin/users", {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${pb.authStore.token}`,
+        },
+        body: JSON.stringify({ userId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error ?? "Failed to revoke access");
+      await refreshUsers();
+    } catch (err: unknown) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to revoke access";
+      setError(msg);
     }
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[80vh] flex flex-col">
-        {/* Header */}
         <div className="flex items-center justify-between p-4 border-b border-border">
           <div className="flex items-center gap-2">
             <Shield className="h-5 w-5 text-indigo-600" />
@@ -304,7 +391,12 @@ function AccessManagementDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* User List */}
+        {error && (
+          <div className="mx-4 mt-3 rounded-md bg-red-50 border border-red-200 p-3">
+            <p className="text-sm text-red-700">{error}</p>
+          </div>
+        )}
+
         <div className="flex-1 overflow-y-auto p-4 space-y-2">
           {users.map((user) => (
             <div
@@ -328,7 +420,7 @@ function AccessManagementDialog({ onClose }: { onClose: () => void }) {
                 onChange={(e) =>
                   handleRoleChange(user.id, e.target.value as Role)
                 }
-                disabled={user.id === "u1"} // Prevent changing own role
+                disabled={user.id === currentUserId}
                 className="px-2.5 py-1.5 rounded-md border border-border bg-white text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <option value="Admin">Admin</option>
@@ -338,7 +430,7 @@ function AccessManagementDialog({ onClose }: { onClose: () => void }) {
               </select>
               <button
                 onClick={() => handleRevokeAccess(user.id)}
-                disabled={user.id === "u1"} // Prevent removing self
+                disabled={user.id === currentUserId}
                 className="px-3 py-1.5 rounded-md text-xs font-medium text-red-600 hover:bg-red-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Revoke Access
@@ -347,7 +439,6 @@ function AccessManagementDialog({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        {/* Footer */}
         <div className="border-t border-border p-4">
           <div className="rounded-md bg-amber-50 border border-amber-200 p-3 mb-3">
             <p className="text-xs text-amber-900">

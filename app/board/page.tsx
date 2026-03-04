@@ -14,9 +14,8 @@ import { TaskCard } from "@/components/board/TaskCard";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { USERS } from "@/lib/mock";
 import { isUserInvolvedInEpic } from "@/lib/permissions";
-import { Task, TaskStatus } from "@/lib/types";
+import { TaskStatus } from "@/lib/types";
 import { ChevronDown, Filter, Kanban, Users, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -24,8 +23,7 @@ const COLUMNS: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 const ALL_STATUSES: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 
 export default function BoardPage() {
-  const { tasks: initialTasks, epics: allEpics } = useDataStore();
-  const [tasks, setTasks] = useState<Task[]>(initialTasks);
+  const { tasks, epics: allEpics, users, updateTask } = useDataStore();
   const { currentUser } = useAuth();
 
   // Epics the current user is allowed to see (Admin sees all; others see only
@@ -36,9 +34,9 @@ export default function BoardPage() {
         ? allEpics
         : allEpics.filter(
             (e) =>
-              currentUser && isUserInvolvedInEpic(e, currentUser.id, initialTasks),
+              currentUser && isUserInvolvedInEpic(e, currentUser.id, tasks),
           ),
-    [allEpics, currentUser, initialTasks],
+    [allEpics, currentUser, tasks],
   );
 
   const visibleEpicIds = useMemo(
@@ -75,14 +73,11 @@ export default function BoardPage() {
 
     const taskId = active.id as string;
     const newStatus = over.id as TaskStatus;
+    const task = tasks.find((t) => t.id === taskId);
 
-    setTasks((prev) =>
-      prev.map((t) => {
-        if (t.id !== taskId) return t;
-        if (t.status === newStatus) return t; // same column — no change
-        return { ...t, status: newStatus };
-      }),
-    );
+    if (task && task.status !== newStatus) {
+      updateTask(taskId, { status: newStatus });
+    }
   }
 
   // ── Filters ────────────────────────────────────────────────────────────────
@@ -309,7 +304,7 @@ export default function BoardPage() {
                   </label>
 
                   {/* User options */}
-                  {USERS.map((user) => (
+                  {users.map((user) => (
                     <label
                       key={user.id}
                       className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-accent cursor-pointer"

@@ -3,8 +3,7 @@
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { getEpicProgress, USERS } from "@/lib/mock";
-import { calculateTeamWorkload, downloadKpiCsv } from "@/lib/utils";
+import { calculateTeamWorkload, downloadKpiCsv, getTaskProgress } from "@/lib/utils";
 import {
   AlertCircle,
   AlertTriangle,
@@ -21,7 +20,7 @@ import Link from "next/link";
 import { useMemo, useState } from "react";
 
 export default function DashboardPage() {
-  const { epics, tasks } = useDataStore();
+  const { epics, tasks, users } = useDataStore();
   const { currentUser } = useAuth();
 
   // ── Epic KPI filter ────────────────────────────────────────────────────────
@@ -55,7 +54,7 @@ export default function DashboardPage() {
   }).length;
 
   // Team Workload using idle resource model (In Progress task count)
-  const workload = useMemo(() => calculateTeamWorkload(USERS, tasks), [tasks]);
+  const workload = useMemo(() => calculateTeamWorkload(users, tasks), [users, tasks]);
 
   const overloadedCount = workload.filter(
     (w) => w.status === "Overloaded",
@@ -67,7 +66,9 @@ export default function DashboardPage() {
   // Epic health (for EWS)
   const epicHealth = epics.map((epic) => {
     const epicTasks = kpiTasks.filter((t) => t.epicId === epic.id);
-    const progress = getEpicProgress(epic.id);
+    const progress = epicTasks.length === 0 ? 0 : Math.round(
+      epicTasks.reduce((sum, t) => sum + getTaskProgress(t), 0) / epicTasks.length
+    );
     const overdue = epicTasks.filter((t) => {
       const due = new Date(t.dueDate);
       return due < NOW && t.status !== "Done";

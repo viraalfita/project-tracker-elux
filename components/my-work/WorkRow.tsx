@@ -1,5 +1,7 @@
+"use client";
+
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
-import { EPICS } from "@/lib/mock";
+import { useDataStore } from "@/contexts/DataStore";
 import { Subtask, Task } from "@/lib/types";
 import { CalendarDays, CheckSquare, Square } from "lucide-react";
 import Link from "next/link";
@@ -9,7 +11,8 @@ interface TaskRowProps {
 }
 
 export function TaskRow({ task }: TaskRowProps) {
-  const epic = EPICS.find((e) => e.id === task.epicId);
+  const { epics } = useDataStore();
+  const epic = epics.find((e) => e.id === task.epicId);
   const isOverdue =
     new Date(task.dueDate) < new Date("2026-02-10") && task.status !== "Done";
 

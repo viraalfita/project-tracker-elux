@@ -31,8 +31,6 @@ const MOCK_TASKS: Task[] = [
     subtasks: [],
     comments: [],
     timeEntries: [],
-    attachments: [],
-    externalLinks: [],
   },
   {
     id: "t2",
@@ -49,8 +47,6 @@ const MOCK_TASKS: Task[] = [
     subtasks: [],
     comments: [],
     timeEntries: [],
-    attachments: [],
-    externalLinks: [],
   },
   {
     id: "t3",
@@ -67,8 +63,6 @@ const MOCK_TASKS: Task[] = [
     subtasks: [],
     comments: [],
     timeEntries: [],
-    attachments: [],
-    externalLinks: [],
   },
   {
     id: "t4",
@@ -85,8 +79,6 @@ const MOCK_TASKS: Task[] = [
     subtasks: [],
     comments: [],
     timeEntries: [],
-    attachments: [],
-    externalLinks: [],
   },
   {
     id: "t5",
@@ -103,8 +95,6 @@ const MOCK_TASKS: Task[] = [
     subtasks: [],
     comments: [],
     timeEntries: [],
-    attachments: [],
-    externalLinks: [],
   },
 ];
 

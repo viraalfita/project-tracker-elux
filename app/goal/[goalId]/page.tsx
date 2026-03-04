@@ -6,9 +6,8 @@ import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { getEpicHealthIndicators } from "@/lib/mock";
 import { canManageGoalLinks } from "@/lib/permissions";
-import { Epic, Goal, GoalKpi, GoalStatus } from "@/lib/types";
+import { Epic, Goal, GoalKpi, GoalStatus, Task } from "@/lib/types";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -28,20 +27,29 @@ interface GoalPageProps {
   params: Promise<{ goalId: string }>;
 }
 
-function deriveGoalStatus(goal: Goal, epics: Epic[]): GoalStatus {
+const NOW = new Date("2026-02-10");
+
+function epicIsAtRisk(epic: Epic, tasks: Task[]): boolean {
+  const epicTasks = tasks.filter((t) => t.epicId === epic.id);
+  const overdueCount = epicTasks.filter(
+    (t) => new Date(t.dueDate) < NOW && t.status !== "Done"
+  ).length;
+  const atRiskCount = epicTasks.filter(
+    (t) => t.status === "In Progress" && t.priority === "High"
+  ).length;
+  return overdueCount > 0 || atRiskCount > 0;
+}
+
+function deriveGoalStatus(goal: Goal, epics: Epic[], tasks: Task[]): GoalStatus {
   const linked = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
   if (linked.length === 0) return "On Track";
   if (linked.every((e) => e.status === "Done")) return "Completed";
-  const anyAtRisk = linked.some((epic) => {
-    const { overdueCount, atRiskCount } = getEpicHealthIndicators(epic.id);
-    return overdueCount > 0 || atRiskCount > 0;
-  });
+  const anyAtRisk = linked.some((epic) => epicIsAtRisk(epic, tasks));
   return anyAtRisk ? "At Risk" : "On Track";
 }
 
-function getEpicHealth(epic: Epic): "At Risk" | "On Track" {
-  const { overdueCount, atRiskCount } = getEpicHealthIndicators(epic.id);
-  return overdueCount > 0 || atRiskCount > 0 ? "At Risk" : "On Track";
+function getEpicHealth(epic: Epic, tasks: Task[]): "At Risk" | "On Track" {
+  return epicIsAtRisk(epic, tasks) ? "At Risk" : "On Track";
 }
 
 const GOAL_STATUS_STYLES: Record<GoalStatus, string> = {
@@ -61,6 +69,7 @@ export default function GoalPage({ params }: GoalPageProps) {
   const {
     goals,
     epics,
+    tasks,
     addGoalKpi,
     updateGoalKpi,
     deleteGoalKpi,
@@ -77,7 +86,7 @@ export default function GoalPage({ params }: GoalPageProps) {
   if (!goal) notFound();
 
   const canManage = canManageGoalLinks(currentUser);
-  const goalStatus = deriveGoalStatus(goal, epics);
+  const goalStatus = deriveGoalStatus(goal, epics, tasks);
   const GoalStatusIcon = GOAL_STATUS_ICONS[goalStatus];
   const linkedEpics = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
 
@@ -312,7 +321,7 @@ export default function GoalPage({ params }: GoalPageProps) {
             ) : (
               <div className="divide-y divide-border">
                 {linkedEpics.map((epic) => {
-                  const health = getEpicHealth(epic);
+                  const health = getEpicHealth(epic, tasks);
                   return (
                     <div
                       key={epic.id}

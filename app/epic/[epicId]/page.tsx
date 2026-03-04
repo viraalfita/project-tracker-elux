@@ -24,10 +24,10 @@ export default function EpicPage({ params }: EpicPageProps) {
   const epic = epics.find((e) => e.id === epicId);
   if (!epic) notFound();
 
-  // Authorization check: ensure user is involved in the epic (or Admin)
+  // Authorization check: Admin has full access; others must be owner or watcher
   if (
     currentUser?.role !== "Admin" &&
-    (!currentUser || !isUserInvolvedInEpic(epic, currentUser.id, tasks))
+    (!currentUser || !isUserInvolvedInEpic(epic, currentUser.id))
   ) {
     notFound(); // Return 404 for unauthorized access (security best practice)
   }
@@ -84,10 +84,10 @@ export default function EpicPage({ params }: EpicPageProps) {
           <EpicTasksTab
             tasks={epicTasks}
             epicId={epic.id}
-            epicMemberIds={epic.memberIds}
+            epic={epic}
           />
         )}
-        {activeTab === "docs" && <EpicDocsTab />}
+        {activeTab === "docs" && <EpicDocsTab epicId={epic.id} epic={epic} />}
       </div>
     </div>
   );

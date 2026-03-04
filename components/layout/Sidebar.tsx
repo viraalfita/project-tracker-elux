@@ -30,12 +30,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/epics", label: "Epics", icon: Folder },
   { href: "/board", label: "Board", icon: Kanban },
   { href: "/my-work", label: "My Work", icon: CheckSquare },
-  {
-    href: "/utilization",
-    label: "Team Workload",
-    icon: BarChart2,
-    roles: ["Manager", "Admin"],
-  },
+  { href: "/utilization", label: "Team Workload", icon: BarChart2 },
   { href: "/workspace", label: "Workspace", icon: Users, roles: ["Admin"] },
 ];
 
@@ -46,11 +41,9 @@ const ROLE_BADGE: Record<Role, string> = {
   Viewer: "bg-slate-100 text-slate-600",
 };
 
-const ALL_ROLES: Role[] = ["Admin", "Manager", "Member"];
-
 export function Sidebar() {
   const pathname = usePathname();
-  const { currentUser, logout, switchRole } = useAuth();
+  const { currentUser, logout } = useAuth();
 
   if (!currentUser) return null;
 
@@ -95,26 +88,8 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Role switcher */}
-      <div className="border-t border-border px-3 py-3 space-y-3">
-        <div>
-          <p className="text-xs text-muted-foreground mb-1 px-1">
-            Switch role (demo)
-          </p>
-          <select
-            value={currentUser.role}
-            onChange={(e) => switchRole(e.target.value as Role)}
-            className="w-full rounded-md border border-border bg-white px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 cursor-pointer"
-          >
-            {ALL_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        {/* Current user + logout */}
+      {/* User + logout */}
+      <div className="border-t border-border px-3 py-3">
         <div className="flex items-center gap-2">
           <span
             className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white shrink-0"

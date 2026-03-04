@@ -3,7 +3,7 @@
 import { useDraggable } from "@dnd-kit/core";
 import { AvatarChip, UnassignedChip } from "@/components/shared/AvatarChip";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
-import { EPICS } from "@/lib/mock";
+import { useDataStore } from "@/contexts/DataStore";
 import { Task } from "@/lib/types";
 import { CalendarDays } from "lucide-react";
 import Link from "next/link";
@@ -14,7 +14,8 @@ interface TaskCardProps {
 }
 
 export function TaskCard({ task, canDragDrop }: TaskCardProps) {
-  const epic = EPICS.find((e) => e.id === task.epicId);
+  const { epics } = useDataStore();
+  const epic = epics.find((e) => e.id === task.epicId);
   const isOverdue = new Date(task.dueDate) < new Date("2026-02-10");
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({

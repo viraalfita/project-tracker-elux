@@ -1,6 +1,6 @@
 "use client";
 
-import { EPICS, USERS } from "@/lib/mock";
+import { useDataStore } from "@/contexts/DataStore";
 import { Priority, Task, TaskStatus } from "@/lib/types";
 import { ChevronDown, Filter, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -41,6 +41,7 @@ export function TaskFilterSort({
   tasks,
   onFilteredTasksChange,
 }: TaskFilterSortProps) {
+  const { epics, users } = useDataStore();
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -254,7 +255,7 @@ export function TaskFilterSort({
                 Assignee
               </label>
               <div className="flex flex-wrap gap-1.5">
-                {USERS.map((user) => (
+                {users.map((user) => (
                   <button
                     key={user.id}
                     onClick={() => toggleArrayFilter("assignees", user.id)}
@@ -332,7 +333,7 @@ export function TaskFilterSort({
                 Epic
               </label>
               <div className="flex flex-wrap gap-1.5">
-                {EPICS.map((epic) => (
+                {epics.map((epic) => (
                   <button
                     key={epic.id}
                     onClick={() => toggleArrayFilter("epics", epic.id)}

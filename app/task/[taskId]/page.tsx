@@ -6,13 +6,10 @@ import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { UserSelect } from "@/components/shared/UserSelect";
 import { WatchersSection } from "@/components/shared/WatchersSection";
-import { AttachmentsSection } from "@/components/task/AttachmentsSection";
 import { CommentsSection } from "@/components/task/CommentsSection";
-import { ExternalLinksSection } from "@/components/task/ExternalLinksSection";
 import { SubtaskList } from "@/components/task/SubtaskList";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { USERS } from "@/lib/mock";
 import {
   canAssignTask,
   canUpdateStatus,
@@ -32,7 +29,8 @@ interface TaskPageProps {
 
 export default function TaskPage({ params }: TaskPageProps) {
   const { taskId } = use(params);
-  const { tasks, epics, updateTask, updateTaskWatchers } = useDataStore();
+  const { tasks, epics, users, updateTask, updateTaskWatchers } =
+    useDataStore();
   const { currentUser } = useAuth();
 
   const task = tasks.find((t) => t.id === taskId);
@@ -40,18 +38,18 @@ export default function TaskPage({ params }: TaskPageProps) {
 
   const epic = epics.find((e) => e.id === task.epicId);
 
-  // Authorization check: ensure user is an epic member (or Admin)
-  if (epic && !canViewEpic(currentUser, epic.memberIds)) {
+  // Authorization check: Admin has full access; others must be owner or watcher
+  if (epic && !canViewEpic(currentUser, epic)) {
     notFound(); // Return 404 for unauthorized access (security best practice)
   }
 
   const [status, setStatus] = useState<TaskStatus>(task.status);
   const [assignee, setAssignee] = useState<User | null>(task.assignee);
 
-  const canEditStatus = canUpdateStatus(currentUser, epic?.memberIds);
-  const canAssign = canAssignTask(currentUser, epic?.memberIds);
-  const assignableUserIds = getAssignableUsers(currentUser, epic?.memberIds ?? []);
-  const assignableUsers = USERS.filter((u) => assignableUserIds.includes(u.id));
+  const canEditStatus = canUpdateStatus(currentUser, epic);
+  const canAssign = canAssignTask(currentUser, epic);
+  const assignableUserIds = getAssignableUsers(currentUser, epic, users);
+  const assignableUsers = users.filter((u) => assignableUserIds.includes(u.id));
 
   // Check for overdue and notify watchers (MVP: on page load)
   useEffect(() => {
@@ -191,7 +189,7 @@ export default function TaskPage({ params }: TaskPageProps) {
                 <div className="flex flex-col gap-1 min-w-[220px]">
                   <WatchersSection
                     watchers={task.watchers}
-                    epicMemberIds={epic.memberIds}
+                    epic={epic}
                     onUpdate={updateTaskWatchers.bind(null, task.id)}
                   />
                 </div>
@@ -214,7 +212,7 @@ export default function TaskPage({ params }: TaskPageProps) {
             <SubtaskList
               taskId={task.id}
               subtasks={task.subtasks}
-              epicMemberIds={epic?.memberIds}
+              epic={epic}
             />
           </div>
 
@@ -223,30 +221,11 @@ export default function TaskPage({ params }: TaskPageProps) {
             <CommentsSection
               taskId={task.id}
               comments={task.comments}
-              epicMemberIds={epic?.memberIds}
-            />
-          </div>
-
-          {/* Attachments */}
-          <div className="rounded-lg border border-border bg-white p-6">
-            <AttachmentsSection
-              taskId={task.id}
-              attachments={task.attachments}
-              canEdit={canEditStatus}
-            />
-          </div>
-
-          {/* External Links */}
-          <div className="rounded-lg border border-border bg-white p-6">
-            <ExternalLinksSection
-              taskId={task.id}
-              links={task.externalLinks}
-              canEdit={canEditStatus}
+              epic={epic}
             />
           </div>
         </div>
       </div>
-
     </div>
   );
 }

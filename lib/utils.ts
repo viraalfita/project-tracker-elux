@@ -2,6 +2,20 @@ import { type ClassValue, clsx } from "clsx";
 import { twMerge } from "tailwind-merge";
 import { Task, User } from "./types";
 
+/**
+ * Calculate progress percentage for a task based on subtask completion.
+ * If no subtasks exist, uses status to determine progress.
+ */
+export function getTaskProgress(task: Task): number {
+  if (task.subtasks.length === 0) {
+    if (task.status === "Done") return 100;
+    if (task.status === "In Progress" || task.status === "Review") return 50;
+    return 0;
+  }
+  const done = task.subtasks.filter((s) => s.done).length;
+  return Math.round((done / task.subtasks.length) * 100);
+}
+
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }

@@ -6,14 +6,13 @@ import { UserSelect } from "@/components/shared/UserSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
-import { USERS } from "@/lib/mock";
 import {
   canAssignTask,
   canCreate,
   canDelete,
   getAssignableUsers,
 } from "@/lib/permissions";
-import { Subtask, User } from "@/lib/types";
+import { Epic, Subtask, User } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Check, CheckSquare, Plus, Square, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -21,15 +20,15 @@ import { useState } from "react";
 interface SubtaskListProps {
   taskId: string;
   subtasks: Subtask[];
-  epicMemberIds?: string[];
+  epic?: Epic;
 }
 
 export function SubtaskList({
   taskId,
   subtasks,
-  epicMemberIds,
+  epic,
 }: SubtaskListProps) {
-  const { createSubtask, deleteSubtask, toggleSubtask } = useDataStore();
+  const { createSubtask, deleteSubtask, toggleSubtask, users } = useDataStore();
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -38,15 +37,12 @@ export function SubtaskList({
   const [newAssignee, setNewAssignee] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Subtask | null>(null);
 
-  const allowCreate = canCreate(currentUser, epicMemberIds);
-  const allowDelete = canDelete(currentUser, epicMemberIds);
+  const allowCreate = canCreate(currentUser, epic);
+  const allowDelete = canDelete(currentUser, epic);
   const allowToggle = allowCreate;
-  const canAssign = canAssignTask(currentUser, epicMemberIds);
-  const assignableUserIds = getAssignableUsers(
-    currentUser,
-    epicMemberIds ?? [],
-  );
-  const assignableUsers = USERS.filter((u) => assignableUserIds.includes(u.id));
+  const canAssign = canAssignTask(currentUser, epic);
+  const assignableUserIds = getAssignableUsers(currentUser, epic, users);
+  const assignableUsers = users.filter((u) => assignableUserIds.includes(u.id));
 
   const doneCount = subtasks.filter((s) => s.done).length;
   const progress =

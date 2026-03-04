@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuth } from "@/contexts/AuthContext";
-import { EPICS, USERS } from "@/lib/mock";
+import { useDataStore } from "@/contexts/DataStore";
 import { Task } from "@/lib/types";
 import { Download, X } from "lucide-react";
 import { useState } from "react";
@@ -16,6 +16,7 @@ export function CSVExportButton({
   filename = "export",
 }: CSVExportButtonProps) {
   const { currentUser } = useAuth();
+  const { epics, users } = useDataStore();
   const [isOpen, setIsOpen] = useState(false);
   const [selectedEpics, setSelectedEpics] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
@@ -77,7 +78,7 @@ export function CSVExportButton({
     ];
 
     const rows = filteredTasks.map((task) => {
-      const epic = EPICS.find((e) => e.id === task.epicId);
+      const epic = epics.find((e) => e.id === task.epicId);
 
       return [
         task.id,
@@ -189,7 +190,7 @@ export function CSVExportButton({
                   Filter by Epic (optional)
                 </label>
                 <div className="max-h-32 overflow-y-auto space-y-1 border border-border rounded p-2">
-                  {EPICS.map((epic) => (
+                  {epics.map((epic) => (
                     <label
                       key={epic.id}
                       className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-slate-50 p-1 rounded"
@@ -212,7 +213,7 @@ export function CSVExportButton({
                   Filter by Assignee (optional)
                 </label>
                 <div className="max-h-32 overflow-y-auto space-y-1 border border-border rounded p-2">
-                  {USERS.map((user) => (
+                  {users.map((user) => (
                     <label
                       key={user.id}
                       className="flex items-center gap-2 text-sm text-foreground cursor-pointer hover:bg-slate-50 p-1 rounded"

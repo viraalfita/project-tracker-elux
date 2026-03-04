@@ -8,9 +8,9 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
-import { getTaskProgress } from "@/lib/mock";
 import { canCreate, canDelete, canEdit } from "@/lib/permissions";
-import { Task } from "@/lib/types";
+import { getTaskProgress } from "@/lib/utils";
+import { Epic, Task } from "@/lib/types";
 import { CalendarDays, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
@@ -18,13 +18,13 @@ import { useState } from "react";
 interface EpicTasksTabProps {
   tasks: Task[];
   epicId: string;
-  epicMemberIds: string[];
+  epic: Epic;
 }
 
 export function EpicTasksTab({
   tasks,
   epicId,
-  epicMemberIds,
+  epic,
 }: EpicTasksTabProps) {
   const { deleteTask } = useDataStore();
   const { toast } = useToast();
@@ -34,7 +34,7 @@ export function EpicTasksTab({
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
 
-  const allowCreate = canCreate(currentUser, epicMemberIds);
+  const allowCreate = canCreate(currentUser, epic);
 
   function handleDeleteConfirm() {
     if (!deleteTarget) return;
@@ -71,8 +71,8 @@ export function EpicTasksTab({
           {tasks.map((task) => {
             const progress = getTaskProgress(task);
             const doneSubtasks = task.subtasks.filter((s) => s.done).length;
-            const allowEditTask = canEdit(currentUser, epicMemberIds);
-            const allowDeleteTask = canDelete(currentUser, epicMemberIds);
+            const allowEditTask = canEdit(currentUser, epic);
+            const allowDeleteTask = canDelete(currentUser, epic);
 
             return (
               <div key={task.id} className="relative group/taskrow">
@@ -151,7 +151,7 @@ export function EpicTasksTab({
         open={showNew}
         onClose={() => setShowNew(false)}
         epicId={epicId}
-        epicMemberIds={epicMemberIds}
+        epic={epic}
       />
 
       {/* Edit dialog */}
@@ -160,7 +160,7 @@ export function EpicTasksTab({
           open={!!editTask}
           onClose={() => setEditTask(null)}
           epicId={epicId}
-          epicMemberIds={epicMemberIds}
+          epic={epic}
           task={editTask}
         />
       )}

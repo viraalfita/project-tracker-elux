@@ -1,9 +1,7 @@
 "use client";
 
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { EPICS, USERS } from "@/lib/mock";
 import { Users2 } from "lucide-react";
 import { useMemo } from "react";
 
@@ -36,36 +34,18 @@ function statusStyle(status: WorkloadStatus) {
 }
 
 export default function UtilizationPage() {
-  const { tasks } = useDataStore();
-  const { currentUser } = useAuth();
-
-  const isAdmin = currentUser?.role === "Admin";
-
-  // Determine visible users based on role
-  const visibleUsers = useMemo(() => {
-    if (!currentUser) return [];
-    if (isAdmin) return USERS;
-
-    // Non-admin: only users in epics the current user can access
-    const accessibleEpics = EPICS.filter((e) =>
-      e.memberIds.includes(currentUser.id),
-    );
-    const accessibleMemberIds = new Set(
-      accessibleEpics.flatMap((e) => e.memberIds),
-    );
-    return USERS.filter((u) => accessibleMemberIds.has(u.id));
-  }, [currentUser, isAdmin]);
+  const { tasks, users } = useDataStore();
 
   // Count "In Progress" tasks per user (idle resource metric)
   const workloadData = useMemo(() => {
-    return visibleUsers.map((user) => {
+    return users.map((user) => {
       const activeTasks = tasks.filter(
         (t) => t.assignee?.id === user.id && t.status === "In Progress",
       ).length;
       const status = getWorkloadStatus(activeTasks);
       return { user, activeTasks, status };
     });
-  }, [visibleUsers, tasks]);
+  }, [users, tasks]);
 
   // Summary counts
   const summary = useMemo(() => {
@@ -130,8 +110,6 @@ export default function UtilizationPage() {
           <p className="text-xs text-indigo-700 mt-1">
             Available: &lt;3 tasks · Balanced: 3–5 tasks · Overloaded: &gt;5
             tasks
-            {!isAdmin &&
-              " · Showing members from your accessible epics only."}
           </p>
         </div>
 

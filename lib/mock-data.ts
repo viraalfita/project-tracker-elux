@@ -9,8 +9,6 @@ function enrichTask(task: Partial<Task>, USERS: User[]): Task {
     ...task,
     owner: task.owner || task.assignee || USERS[0],
     watchers: task.watchers || [],
-    attachments: task.attachments || [],
-    externalLinks: task.externalLinks || [],
   } as Task;
 }
 
@@ -79,33 +77,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
       ],
       owner: USERS[2], // Frontend Dev
       watchers: [USERS[0], USERS[1]], // Admin, Manager
-      attachments: [
-        {
-          id: "att1-1",
-          filename: "hero-mockup-v3.fig",
-          url: "/attachments/hero-mockup-v3.fig",
-          size: 2048576, // 2MB
-          uploadedBy: USERS[4],
-          uploadedAt: "2026-02-01 10:00",
-        },
-        {
-          id: "att1-2",
-          filename: "responsive-specs.pdf",
-          url: "/attachments/responsive-specs.pdf",
-          size: 512000, // 512KB
-          uploadedBy: USERS[2],
-          uploadedAt: "2026-02-03 14:30",
-        },
-      ],
-      externalLinks: [
-        {
-          id: "link1-1",
-          url: "https://www.figma.com/design/ABC123",
-          label: "Figma Design File",
-          addedBy: USERS[4],
-          addedAt: "2026-02-01 09:00",
-        },
-      ],
     },
     {
       id: "t2",

@@ -1,5 +1,7 @@
+// HISTORICAL: No longer imported by the running app.
+// Used only by scripts/setup-pocketbase.ts for the one-time seed.
 import { generateComprehensiveTasks } from "./mock-data";
-import { Epic, Goal, Subtask, Task, User } from "./types";
+import { Epic, EpicDoc, Goal, Subtask, Task, User } from "./types";
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 
@@ -76,7 +78,6 @@ export const EPICS: Epic[] = [
     status: "In Progress",
     startDate: "2026-01-15",
     endDate: "2026-03-15",
-    memberIds: ["u1", "u2", "u3", "u4", "u5"],
   },
   {
     id: "e2",
@@ -88,7 +89,6 @@ export const EPICS: Epic[] = [
     status: "In Progress",
     startDate: "2026-02-01",
     endDate: "2026-02-28",
-    memberIds: ["u1", "u2", "u3", "u4"],
   },
   {
     id: "e3",
@@ -100,7 +100,6 @@ export const EPICS: Epic[] = [
     status: "Not Started",
     startDate: "2026-03-01",
     endDate: "2026-04-30",
-    memberIds: ["u1", "u2", "u3", "u5"],
   },
   {
     id: "e4",
@@ -112,7 +111,6 @@ export const EPICS: Epic[] = [
     status: "In Progress",
     startDate: "2026-01-20",
     endDate: "2026-02-25",
-    memberIds: ["u1", "u2", "u4"],
   },
   {
     id: "e5",
@@ -124,7 +122,6 @@ export const EPICS: Epic[] = [
     status: "On Hold",
     startDate: "2026-02-10",
     endDate: "2026-03-20",
-    memberIds: ["u1", "u2", "u3", "u4", "u5"],
   },
   {
     id: "e6",
@@ -136,7 +133,6 @@ export const EPICS: Epic[] = [
     status: "Done",
     startDate: "2025-12-01",
     endDate: "2026-01-31",
-    memberIds: ["u1", "u2", "u4", "u6"], // u4 (owner Ahrasya) included explicitly
   },
 ];
 
@@ -241,6 +237,41 @@ export const GOALS: Goal[] = [
 // ─── Tasks ────────────────────────────────────────────────────────────────────
 
 export const TASKS: Task[] = generateComprehensiveTasks(USERS);
+
+// ─── EpicDocs ─────────────────────────────────────────────────────────────────
+
+export const EPIC_DOCS: EpicDoc[] = [
+  {
+    id: "d1",
+    epicId: "e1",
+    title: "Overview",
+    content:
+      "The E-Commerce Platform Redesign covers a full UI/UX overhaul of the customer-facing storefront. This epic aligns with the new design system and focuses on responsive layouts, checkout flow optimization, and WCAG AA accessibility compliance.",
+    createdBy: USERS[0],
+    createdAt: "2026-01-15T09:00:00Z",
+    updatedAt: "2026-01-20T14:30:00Z",
+  },
+  {
+    id: "d2",
+    epicId: "e1",
+    title: "Technical Spec",
+    content:
+      "## Stack\n- Next.js 15 (App Router)\n- Tailwind CSS v4\n- Radix UI primitives\n\n## Key decisions\n- Server components for product listing pages\n- Client components for cart and checkout\n- Image optimization via next/image with blur placeholders",
+    createdBy: USERS[1],
+    createdAt: "2026-01-16T11:00:00Z",
+    updatedAt: "2026-01-18T16:00:00Z",
+  },
+  {
+    id: "d3",
+    epicId: "e2",
+    title: "Integration Plan",
+    content:
+      "## Payment Providers\n- Stripe for card payments and subscriptions\n- PayPal for wallet payments\n\n## Fraud detection\n- Stripe Radar rules enabled\n- Order velocity checks on backend\n\n## Currency support\n- Multi-currency via Stripe's presentment currency feature",
+    createdBy: USERS[3],
+    createdAt: "2026-02-01T10:00:00Z",
+    updatedAt: "2026-02-03T12:00:00Z",
+  },
+];
 
 // ─── Rollup helpers ───────────────────────────────────────────────────────────
 

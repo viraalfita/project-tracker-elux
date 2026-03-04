@@ -24,23 +24,6 @@ export interface Project {
   memberIds: string[];
 }
 
-export interface Attachment {
-  id: string;
-  filename: string;
-  url: string;
-  size: number;
-  uploadedBy: User;
-  uploadedAt: string;
-}
-
-export interface ExternalLink {
-  id: string;
-  url: string;
-  label: string;
-  addedBy: User;
-  addedAt: string;
-}
-
 export interface Comment {
   id: string;
   taskId: string;
@@ -75,8 +58,6 @@ export interface Task {
   estimate?: number;
   subtasks: Subtask[];
   comments: Comment[];
-  attachments: Attachment[];
-  externalLinks: ExternalLink[];
 }
 
 export interface Epic {
@@ -89,7 +70,16 @@ export interface Epic {
   status: EpicStatus;
   startDate?: string;
   endDate?: string;
-  memberIds: string[];
+}
+
+export interface EpicDoc {
+  id: string;
+  epicId: string;
+  title: string;
+  content: string;
+  createdBy: User;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type GoalStatus = "On Track" | "At Risk" | "Completed";

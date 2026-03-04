@@ -3,37 +3,24 @@
 import { AvatarChip } from "@/components/shared/AvatarChip";
 import { ProgressBar } from "@/components/shared/ProgressBar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
-import { UserSelect } from "@/components/shared/UserSelect";
 import { WatchersSection } from "@/components/shared/WatchersSection";
-import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { getEpicProgress, getTasksByEpic, USERS } from "@/lib/mock";
-import { isAdmin } from "@/lib/permissions";
-import { Epic, User } from "@/lib/types";
+import { getTaskProgress } from "@/lib/utils";
+import { Epic } from "@/lib/types";
 import { CalendarDays, ListChecks } from "lucide-react";
-import { useState } from "react";
 
 interface EpicHeaderProps {
   epic: Epic;
 }
 
 export function EpicHeader({ epic }: EpicHeaderProps) {
-  const { currentUser } = useAuth();
-  const { updateEpic, updateEpicWatchers } = useDataStore();
-  const [owner, setOwner] = useState<User>(epic.owner);
+  const { updateEpicWatchers, tasks: allTasks } = useDataStore();
 
-  const progress = getEpicProgress(epic.id);
-  const tasks = getTasksByEpic(epic.id);
+  const tasks = allTasks.filter((t) => t.epicId === epic.id);
   const doneTasks = tasks.filter((t) => t.status === "Done").length;
-
-  // Only Admins can change epic owner
-  const canChangeOwner = isAdmin(currentUser);
-
-  function handleOwnerChange(newOwner: User | null) {
-    if (!newOwner) return; // Owner is required
-    setOwner(newOwner);
-    updateEpic(epic.id, { ownerId: newOwner.id });
-  }
+  const progress = tasks.length === 0 ? 0 : Math.round(
+    tasks.reduce((sum, t) => sum + getTaskProgress(t), 0) / tasks.length
+  );
 
   return (
     <div className="rounded-lg border border-border bg-white p-6">
@@ -56,23 +43,13 @@ export function EpicHeader({ epic }: EpicHeaderProps) {
             <span className="text-xs uppercase tracking-wide font-medium">
               Owner
             </span>
-            {canChangeOwner ? (
-              <UserSelect
-                users={USERS}
-                value={owner}
-                onChange={handleOwnerChange}
-                placeholder="Select owner..."
-                allowUnassigned={false}
-              />
-            ) : (
-              <AvatarChip user={owner} size="sm" showName />
-            )}
+            <AvatarChip user={epic.owner} size="sm" showName />
           </div>
 
           <div className="flex flex-col gap-1 min-w-[220px]">
             <WatchersSection
               watchers={epic.watchers}
-              epicMemberIds={epic.memberIds}
+              epic={epic}
               onUpdate={updateEpicWatchers.bind(null, epic.id)}
             />
           </div>

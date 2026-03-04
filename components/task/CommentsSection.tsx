@@ -6,20 +6,20 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
 import { canComment, canDelete } from "@/lib/permissions";
-import { Comment } from "@/lib/types";
+import { Comment, Epic } from "@/lib/types";
 import { Send, Trash2 } from "lucide-react";
 import { useState } from "react";
 
 interface CommentsSectionProps {
   taskId: string;
   comments: Comment[];
-  epicMemberIds?: string[];
+  epic?: Epic;
 }
 
 export function CommentsSection({
   taskId,
   comments,
-  epicMemberIds,
+  epic,
 }: CommentsSectionProps) {
   const { addComment, deleteComment } = useDataStore();
   const { toast } = useToast();
@@ -28,7 +28,7 @@ export function CommentsSection({
   const [draft, setDraft] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<Comment | null>(null);
 
-  const canPost = canComment(currentUser, epicMemberIds);
+  const canPost = canComment(currentUser, epic);
 
   function handlePost() {
     if (!draft.trim() || !currentUser) return;
@@ -52,7 +52,7 @@ export function CommentsSection({
 
   function canDeleteComment(comment: Comment): boolean {
     // Admin can delete any; Member can delete their own in their epic
-    return canDelete(currentUser, epicMemberIds, comment.author.id);
+    return canDelete(currentUser, epic, comment.author.id);
   }
 
   return (

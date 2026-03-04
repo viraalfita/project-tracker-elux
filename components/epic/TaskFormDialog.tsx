@@ -4,9 +4,8 @@ import { UserSelect } from "@/components/shared/UserSelect";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
-import { USERS } from "@/lib/mock";
 import { canAssignTask, getAssignableUsers } from "@/lib/permissions";
-import { Priority, Task, TaskStatus, User } from "@/lib/types";
+import { Epic, Priority, Task, TaskStatus, User } from "@/lib/types";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -18,7 +17,7 @@ interface TaskFormDialogProps {
   open: boolean;
   onClose: () => void;
   epicId: string;
-  epicMemberIds: string[];
+  epic: Epic;
   /** When set, the dialog is in edit mode. */
   task?: Task;
 }
@@ -27,10 +26,10 @@ export function TaskFormDialog({
   open,
   onClose,
   epicId,
-  epicMemberIds,
+  epic,
   task,
 }: TaskFormDialogProps) {
-  const { createTask, updateTask } = useDataStore();
+  const { createTask, updateTask, users } = useDataStore();
   const { toast } = useToast();
   const { currentUser } = useAuth();
 
@@ -44,9 +43,9 @@ export function TaskFormDialog({
   const [assignee, setAssignee] = useState<User | null>(task?.assignee ?? null);
 
   // Get assignable users based on permissions
-  const canAssign = canAssignTask(currentUser, epicMemberIds);
-  const assignableUserIds = getAssignableUsers(currentUser, epicMemberIds);
-  const assignableUsers = USERS.filter((u) => assignableUserIds.includes(u.id));
+  const canAssign = canAssignTask(currentUser, epic);
+  const assignableUserIds = getAssignableUsers(currentUser, epic, users);
+  const assignableUsers = users.filter((u) => assignableUserIds.includes(u.id));
 
   useEffect(() => {
     if (open) {

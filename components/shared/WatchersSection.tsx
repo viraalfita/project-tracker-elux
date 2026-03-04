@@ -2,35 +2,33 @@
 
 import { AvatarChip } from "@/components/shared/AvatarChip";
 import { useAuth } from "@/contexts/AuthContext";
-import { USERS } from "@/lib/mock";
-import { canManageWatchers, isAdmin } from "@/lib/permissions";
-import { User } from "@/lib/types";
+import { useDataStore } from "@/contexts/DataStore";
+import { canManageWatchers } from "@/lib/permissions";
+import { Epic, User } from "@/lib/types";
 import { Eye } from "lucide-react";
 import { useState } from "react";
 
 interface WatchersSectionProps {
   watchers: User[];
-  epicMemberIds: string[];
+  epic: Epic;
   onUpdate: (watcherIds: string[]) => void;
 }
 
 export function WatchersSection({
   watchers,
-  epicMemberIds,
+  epic,
   onUpdate,
 }: WatchersSectionProps) {
   const { currentUser } = useAuth();
+  const { users } = useDataStore();
   const [isEditing, setIsEditing] = useState(false);
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>(
     watchers.map((w) => w.id),
   );
 
-  // Admin can watch/add any user; members can only add fellow epic members.
-  const availableUsers = isAdmin(currentUser)
-    ? USERS
-    : USERS.filter((u) => epicMemberIds.includes(u.id));
-
-  const canEdit = canManageWatchers(currentUser, epicMemberIds);
+  // Any workspace user can be added as a watcher (the owner controls the list).
+  // Edit button is only shown to the epic owner and Admin.
+  const canEdit = canManageWatchers(currentUser, epic);
 
   function handleToggleUser(userId: string) {
     setSelectedUserIds((prev) =>
@@ -75,7 +73,7 @@ export function WatchersSection({
             Select users to watch this item:
           </div>
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
-            {availableUsers.map((user) => (
+            {users.map((user) => (
               <label
                 key={user.id}
                 className="flex items-center gap-2 p-2 rounded hover:bg-white cursor-pointer transition-colors"

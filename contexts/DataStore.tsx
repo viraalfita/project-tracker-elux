@@ -1,9 +1,30 @@
 "use client";
 
-import { EPICS, GOALS, TASKS, USERS } from "@/lib/mock";
+import {
+  mapComment,
+  mapEpic,
+  mapEpicDoc,
+  mapGoal,
+  mapGoalKpi,
+  mapSubtask,
+  mapTask,
+  mapUser,
+} from "@/lib/pb-mappers";
+import {
+  PBComment,
+  PBEpic,
+  PBEpicDoc,
+  PBGoal,
+  PBGoalKpi,
+  PBSubtask,
+  PBTask,
+  PBUser,
+} from "@/lib/pb-types";
+import { pb } from "@/lib/pocketbase";
 import {
   Comment,
   Epic,
+  EpicDoc,
   EpicStatus,
   Goal,
   GoalKpi,
@@ -18,13 +39,30 @@ import {
   ReactNode,
   useCallback,
   useContext,
+  useEffect,
   useState,
 } from "react";
 
 interface DataStoreContextType {
   goals: Goal[];
   epics: Epic[];
+  epicDocs: EpicDoc[];
   tasks: Task[];
+  users: User[];
+  isLoading: boolean;
+  refreshUsers: () => Promise<void>;
+  // EpicDoc CRUD
+  createEpicDoc: (
+    epicId: string,
+    title: string,
+    content: string,
+    author: User,
+  ) => EpicDoc;
+  updateEpicDoc: (
+    id: string,
+    data: { title?: string; content?: string },
+  ) => void;
+  deleteEpicDoc: (id: string) => void;
   // Goal KPI operations
   addGoalKpi: (goalId: string, kpi: Omit<GoalKpi, "id">) => void;
   updateGoalKpi: (
@@ -41,7 +79,6 @@ interface DataStoreContextType {
     description: string;
     ownerId: string;
     status: EpicStatus;
-    memberIds?: string[];
     startDate?: string;
     endDate?: string;
   }) => Epic;
@@ -85,20 +122,171 @@ interface DataStoreContextType {
 const DataStoreContext = createContext<DataStoreContextType | null>(null);
 
 export function DataStoreProvider({ children }: { children: ReactNode }) {
-  const [goals, setGoals] = useState<Goal[]>([...GOALS]);
-  const [epics, setEpics] = useState<Epic[]>([...EPICS]);
-  const [tasks, setTasks] = useState<Task[]>([...TASKS]);
+  const [goals, setGoals] = useState<Goal[]>([]);
+  const [epics, setEpics] = useState<Epic[]>([]);
+  const [epicDocs, setEpicDocs] = useState<EpicDoc[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  // Incrementing this triggers a data reload (e.g. after login).
+  const [authTrigger, setAuthTrigger] = useState(0);
 
-  // ── Goal operations ───────────────────────────────────────────────────────
+  // ── Re-trigger load on login / logout ────────────────────────────────────
+
+  useEffect(() => {
+    const unsub = pb.authStore.onChange((_token, model) => {
+      if (model) {
+        // User just logged in — reload all data
+        setAuthTrigger((n) => n + 1);
+      } else {
+        // User logged out — clear all state
+        setGoals([]);
+        setEpics([]);
+        setEpicDocs([]);
+        setTasks([]);
+        setUsers([]);
+        setIsLoading(false);
+      }
+    });
+    return () => unsub();
+  }, []);
+
+  // ── Data load (runs on mount and after authTrigger changes) ──────────────
+
+  useEffect(() => {
+    async function load() {
+      setIsLoading(true);
+
+      // Guard: do not attempt record fetches if there is no valid auth token.
+      // This prevents 403 errors when the DataStore mounts before the user
+      // has authenticated (no token in localStorage).
+      if (!pb.authStore.isValid) {
+        setIsLoading(false);
+        return;
+      }
+
+      try {
+        const [
+          pbUsers,
+          pbEpics,
+          pbTasks,
+          pbGoals,
+          pbKpis,
+          pbSubtasks,
+          pbComments,
+          pbEpicDocs,
+        ] = await Promise.all([
+          pb.collection("users").getFullList<PBUser>(),
+          pb.collection("epics").getFullList<PBEpic>({
+            expand: "owner,watchers",
+          }),
+          pb.collection("tasks").getFullList<PBTask>({
+            expand: "owner,assignee,watchers",
+          }),
+          pb.collection("goals").getFullList<PBGoal>({
+            expand: "owner,linked_epics",
+          }),
+          pb.collection("goal_kpis").getFullList<PBGoalKpi>(),
+          pb.collection("subtasks").getFullList<PBSubtask>({
+            expand: "assignee",
+          }),
+          pb.collection("comments").getFullList<PBComment>({
+            expand: "author,mentions",
+          }),
+          pb.collection("epic_docs").getFullList<PBEpicDoc>({
+            expand: "created_by",
+          }),
+        ]);
+
+        setUsers(pbUsers.map(mapUser));
+        setEpics(pbEpics.map(mapEpic));
+        setEpicDocs(pbEpicDocs.map(mapEpicDoc));
+
+        const mappedTasks = pbTasks.map((t) => {
+          const subtasks = pbSubtasks
+            .filter((s) => s.task === t.id)
+            .map(mapSubtask);
+          const comments = pbComments
+            .filter((c) => c.task === t.id)
+            .map(mapComment);
+          return mapTask(t, subtasks, comments);
+        });
+        setTasks(mappedTasks);
+
+        const mappedGoals = pbGoals.map((g) => {
+          const kpis = pbKpis.filter((k) => k.goal === g.id).map(mapGoalKpi);
+          return mapGoal(g, kpis);
+        });
+        setGoals(mappedGoals);
+      } catch (err) {
+        console.error("DataStore: failed to load from PocketBase:", err);
+        if (
+          process.env.NODE_ENV === "development" &&
+          err &&
+          typeof err === "object" &&
+          "data" in err
+        ) {
+          console.error(
+            "PocketBase error detail:",
+            JSON.stringify((err as Record<string, unknown>).data, null, 2),
+          );
+        }
+      } finally {
+        setIsLoading(false);
+      }
+    }
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authTrigger]);
+
+  const refreshUsers = useCallback(async () => {
+    const pbUsers = await pb.collection("users").getFullList<PBUser>();
+    setUsers(pbUsers.map(mapUser));
+  }, []);
+
+  // ── Goal operations ──────────────────────────────────────────────────────
 
   const addGoalKpi = useCallback((goalId: string, kpi: Omit<GoalKpi, "id">) => {
+    const tempId = `kpi-${Date.now()}`;
     setGoals((prev) =>
       prev.map((g) =>
         g.id === goalId
-          ? { ...g, kpis: [...g.kpis, { ...kpi, id: `kpi-${Date.now()}` }] }
+          ? { ...g, kpis: [...g.kpis, { ...kpi, id: tempId }] }
           : g,
       ),
     );
+    pb.collection("goal_kpis")
+      .create({
+        label: kpi.label,
+        target: kpi.target,
+        current: kpi.current,
+        unit: kpi.unit,
+        green_threshold: kpi.greenThreshold,
+        yellow_threshold: kpi.yellowThreshold,
+        goal: goalId,
+      })
+      .then((record) => {
+        const realKpi = mapGoalKpi(record as unknown as PBGoalKpi);
+        setGoals((prev) =>
+          prev.map((g) =>
+            g.id === goalId
+              ? {
+                  ...g,
+                  kpis: g.kpis.map((k) => (k.id === tempId ? realKpi : k)),
+                }
+              : g,
+          ),
+        );
+      })
+      .catch(() => {
+        setGoals((prev) =>
+          prev.map((g) =>
+            g.id === goalId
+              ? { ...g, kpis: g.kpis.filter((k) => k.id !== tempId) }
+              : g,
+          ),
+        );
+      });
   }, []);
 
   const updateGoalKpi = useCallback(
@@ -115,19 +303,56 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
             : g,
         ),
       );
+      pb.collection("goal_kpis")
+        .update(kpiId, {
+          label: data.label,
+          target: data.target,
+          current: data.current,
+          unit: data.unit,
+          green_threshold: data.greenThreshold,
+          yellow_threshold: data.yellowThreshold,
+        })
+        .catch(() => {
+          // On error, reload from server
+          pb.collection("goal_kpis")
+            .getOne<PBGoalKpi>(kpiId)
+            .then((record) => {
+              const serverKpi = mapGoalKpi(record);
+              setGoals((prev) =>
+                prev.map((g) =>
+                  g.id === goalId
+                    ? {
+                        ...g,
+                        kpis: g.kpis.map((k) =>
+                          k.id === kpiId ? serverKpi : k,
+                        ),
+                      }
+                    : g,
+                ),
+              );
+            })
+            .catch(() => {});
+        });
     },
     [],
   );
 
-  const deleteGoalKpi = useCallback((goalId: string, kpiId: string) => {
-    setGoals((prev) =>
-      prev.map((g) =>
-        g.id === goalId
-          ? { ...g, kpis: g.kpis.filter((k) => k.id !== kpiId) }
-          : g,
-      ),
-    );
-  }, []);
+  const deleteGoalKpi = useCallback(
+    (goalId: string, kpiId: string) => {
+      const prevGoals = goals;
+      setGoals((prev) =>
+        prev.map((g) =>
+          g.id === goalId
+            ? { ...g, kpis: g.kpis.filter((k) => k.id !== kpiId) }
+            : g,
+        ),
+      );
+      pb.collection("goal_kpis")
+        .delete(kpiId)
+        .catch(() => setGoals(prevGoals));
+    },
+    [goals],
+  );
 
   const updateGoalLinkedEpics = useCallback(
     (goalId: string, epicIds: string[]) => {
@@ -136,11 +361,14 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
           g.id === goalId ? { ...g, linkedEpicIds: epicIds } : g,
         ),
       );
+      pb.collection("goals")
+        .update(goalId, { linked_epics: epicIds })
+        .catch(() => {});
     },
     [],
   );
 
-  // ── Epic CRUD ─────────────────────────────────────────────────────────────
+  // ── Epic CRUD ────────────────────────────────────────────────────────────
 
   const createEpic = useCallback(
     (data: {
@@ -148,54 +376,90 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       description: string;
       ownerId: string;
       status: EpicStatus;
-      memberIds?: string[];
       startDate?: string;
       endDate?: string;
     }): Epic => {
-      const owner = USERS.find((u) => u.id === data.ownerId) ?? USERS[0];
-      // Ensure owner is always a member and a watcher of the epic they create.
-      const memberSet = new Set([data.ownerId, ...(data.memberIds ?? [])]);
-      const newEpic: Epic = {
-        id: `e-${Date.now()}`,
+      const owner = users.find((u) => u.id === data.ownerId) ?? users[0];
+      const tempId = `epic-${Date.now()}`;
+      const tempEpic: Epic = {
+        id: tempId,
         title: data.title,
         description: data.description,
         owner,
-        watchers: [owner],
+        watchers: [],
         status: data.status,
         startDate: data.startDate || undefined,
         endDate: data.endDate || undefined,
-        memberIds: Array.from(memberSet),
       };
-      setEpics((prev) => [...prev, newEpic]);
-      return newEpic;
+      setEpics((prev) => [...prev, tempEpic]);
+
+      pb.collection("epics")
+        .create(
+          {
+            title: data.title,
+            description: data.description,
+            status: data.status,
+            start_date: data.startDate
+              ? `${data.startDate} 00:00:00.000Z`
+              : null,
+            end_date: data.endDate ? `${data.endDate} 00:00:00.000Z` : null,
+            owner: data.ownerId,
+            watchers: [],
+          },
+          { expand: "owner,watchers" },
+        )
+        .then((record) => {
+          const real = mapEpic(record as unknown as PBEpic);
+          setEpics((prev) => prev.map((e) => (e.id === tempId ? real : e)));
+        })
+        .catch(() => {
+          setEpics((prev) => prev.filter((e) => e.id !== tempId));
+        });
+
+      return tempEpic;
     },
-    [],
+    [users],
   );
 
   const updateEpic = useCallback(
     (
       id: string,
       data: Partial<
-        Pick<
-          Epic,
-          "title" | "description" | "status" | "startDate" | "endDate"
-        >
+        Pick<Epic, "title" | "description" | "status" | "startDate" | "endDate">
       > & { ownerId?: string },
     ) => {
       setEpics((prev) =>
         prev.map((e) => {
           if (e.id !== id) return e;
           const updated = { ...e, ...data };
-          // If ownerId is provided, find the user and update owner
           if (data.ownerId) {
-            const newOwner = USERS.find((u) => u.id === data.ownerId);
+            const newOwner = users.find((u) => u.id === data.ownerId);
             if (newOwner) updated.owner = newOwner;
           }
           return updated;
         }),
       );
+
+      const payload: Record<string, unknown> = {};
+      if (data.title !== undefined) payload.title = data.title;
+      if (data.description !== undefined)
+        payload.description = data.description;
+      if (data.status !== undefined) payload.status = data.status;
+      if (data.startDate !== undefined)
+        payload.start_date = data.startDate
+          ? `${data.startDate} 00:00:00.000Z`
+          : null;
+      if (data.endDate !== undefined)
+        payload.end_date = data.endDate
+          ? `${data.endDate} 00:00:00.000Z`
+          : null;
+      if (data.ownerId !== undefined) payload.owner = data.ownerId;
+
+      pb.collection("epics")
+        .update(id, payload)
+        .catch(() => {});
     },
-    [],
+    [users],
   );
 
   const updateEpicWatchers = useCallback(
@@ -203,25 +467,26 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setEpics((prev) =>
         prev.map((e) => {
           if (e.id !== epicId) return e;
-          const watchers = USERS.filter((u) => watcherIds.includes(u.id));
-          // Simulate notification to watchers
-          console.log(
-            `[Notification] Epic "${e.title}" watchers updated:`,
-            watchers.map((w) => w.name),
-          );
+          const watchers = users.filter((u) => watcherIds.includes(u.id));
           return { ...e, watchers };
         }),
       );
+      pb.collection("epics")
+        .update(epicId, { watchers: watcherIds })
+        .catch(() => {});
     },
-    [],
+    [users],
   );
 
   const deleteEpic = useCallback((id: string) => {
     setEpics((prev) => prev.filter((e) => e.id !== id));
     setTasks((prev) => prev.filter((t) => t.epicId !== id));
+    pb.collection("epics")
+      .delete(id)
+      .catch(() => {});
   }, []);
 
-  // ── Task CRUD ─────────────────────────────────────────────────────────────
+  // ── Task CRUD ────────────────────────────────────────────────────────────
 
   const createTask = useCallback(
     (data: {
@@ -233,10 +498,11 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       assigneeId?: string;
     }): Task => {
       const assignee = data.assigneeId
-        ? USERS.find((u) => u.id === data.assigneeId) || null
+        ? users.find((u) => u.id === data.assigneeId) || null
         : null;
-      const newTask: Task = {
-        id: `t-${Date.now()}`,
+      const tempId = `task-${Date.now()}`;
+      const tempTask: Task = {
+        id: tempId,
         epicId: data.epicId,
         title: data.title,
         description: data.description ?? "",
@@ -248,13 +514,33 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         dueDate: "",
         subtasks: [],
         comments: [],
-        attachments: [],
-        externalLinks: [],
       };
-      setTasks((prev) => [...prev, newTask]);
-      return newTask;
+      setTasks((prev) => [...prev, tempTask]);
+
+      pb.collection("tasks")
+        .create(
+          {
+            title: data.title,
+            description: data.description ?? "",
+            status: data.status ?? "To Do",
+            priority: data.priority ?? "Medium",
+            epic: data.epicId,
+            assignee: data.assigneeId ?? null,
+            owner: data.assigneeId ?? null,
+          },
+          { expand: "owner,assignee,watchers" },
+        )
+        .then((record) => {
+          const real = mapTask(record as unknown as PBTask, [], []);
+          setTasks((prev) => prev.map((t) => (t.id === tempId ? real : t)));
+        })
+        .catch(() => {
+          setTasks((prev) => prev.filter((t) => t.id !== tempId));
+        });
+
+      return tempTask;
     },
-    [],
+    [users],
   );
 
   const updateTask = useCallback(
@@ -268,28 +554,29 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         prev.map((t) => {
           if (t.id !== id) return t;
           const updated = { ...t, ...data };
-          // If assigneeId is provided, find the user and update assignee
           if (data.assigneeId !== undefined) {
             updated.assignee = data.assigneeId
-              ? USERS.find((u) => u.id === data.assigneeId) || null
+              ? users.find((u) => u.id === data.assigneeId) || null
               : null;
-          }
-          // Notify watchers on status change
-          if (
-            data.status &&
-            data.status !== t.status &&
-            t.watchers.length > 0
-          ) {
-            console.log(
-              `[Notification] Task "${t.title}" status changed to ${data.status}. Notifying:`,
-              t.watchers.map((w) => w.name),
-            );
           }
           return updated;
         }),
       );
+
+      const payload: Record<string, unknown> = {};
+      if (data.title !== undefined) payload.title = data.title;
+      if (data.description !== undefined)
+        payload.description = data.description;
+      if (data.status !== undefined) payload.status = data.status;
+      if (data.priority !== undefined) payload.priority = data.priority;
+      if (data.assigneeId !== undefined)
+        payload.assignee = data.assigneeId || null;
+
+      pb.collection("tasks")
+        .update(id, payload)
+        .catch(() => {});
     },
-    [],
+    [users],
   );
 
   const updateTaskWatchers = useCallback(
@@ -297,32 +584,34 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       setTasks((prev) =>
         prev.map((t) => {
           if (t.id !== taskId) return t;
-          const watchers = USERS.filter((u) => watcherIds.includes(u.id));
-          // Simulate notification to watchers
-          console.log(
-            `[Notification] Task "${t.title}" watchers updated:`,
-            watchers.map((w) => w.name),
-          );
+          const watchers = users.filter((u) => watcherIds.includes(u.id));
           return { ...t, watchers };
         }),
       );
+      pb.collection("tasks")
+        .update(taskId, { watchers: watcherIds })
+        .catch(() => {});
     },
-    [],
+    [users],
   );
 
   const deleteTask = useCallback((id: string) => {
     setTasks((prev) => prev.filter((t) => t.id !== id));
+    pb.collection("tasks")
+      .delete(id)
+      .catch(() => {});
   }, []);
 
-  // ── Subtask CRUD ──────────────────────────────────────────────────────────
+  // ── Subtask CRUD ─────────────────────────────────────────────────────────
 
   const createSubtask = useCallback(
     (taskId: string, data: { title: string; assigneeId?: string }): Subtask => {
       const assignee = data.assigneeId
-        ? USERS.find((u) => u.id === data.assigneeId) || undefined
+        ? users.find((u) => u.id === data.assigneeId) || undefined
         : undefined;
-      const newSubtask: Subtask = {
-        id: `s-${Date.now()}`,
+      const tempId = `sub-${Date.now()}`;
+      const tempSubtask: Subtask = {
+        id: tempId,
         taskId,
         title: data.title,
         done: false,
@@ -330,12 +619,50 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       };
       setTasks((prev) =>
         prev.map((t) =>
-          t.id === taskId ? { ...t, subtasks: [...t.subtasks, newSubtask] } : t,
+          t.id === taskId
+            ? { ...t, subtasks: [...t.subtasks, tempSubtask] }
+            : t,
         ),
       );
-      return newSubtask;
+
+      pb.collection("subtasks")
+        .create(
+          {
+            title: data.title,
+            done: false,
+            task: taskId,
+            assignee: data.assigneeId ?? null,
+          },
+          { expand: "assignee" },
+        )
+        .then((record) => {
+          const real = mapSubtask(record as unknown as PBSubtask);
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    subtasks: t.subtasks.map((s) =>
+                      s.id === tempId ? real : s,
+                    ),
+                  }
+                : t,
+            ),
+          );
+        })
+        .catch(() => {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === taskId
+                ? { ...t, subtasks: t.subtasks.filter((s) => s.id !== tempId) }
+                : t,
+            ),
+          );
+        });
+
+      return tempSubtask;
     },
-    [],
+    [users],
   );
 
   const deleteSubtask = useCallback((taskId: string, subtaskId: string) => {
@@ -346,40 +673,93 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
           : t,
       ),
     );
+    pb.collection("subtasks")
+      .delete(subtaskId)
+      .catch(() => {});
   }, []);
 
-  const toggleSubtask = useCallback((taskId: string, subtaskId: string) => {
-    setTasks((prev) =>
-      prev.map((t) =>
-        t.id === taskId
-          ? {
-              ...t,
-              subtasks: t.subtasks.map((s) =>
-                s.id === subtaskId ? { ...s, done: !s.done } : s,
-              ),
-            }
-          : t,
-      ),
-    );
-  }, []);
+  const toggleSubtask = useCallback(
+    (taskId: string, subtaskId: string) => {
+      setTasks((prev) =>
+        prev.map((t) =>
+          t.id === taskId
+            ? {
+                ...t,
+                subtasks: t.subtasks.map((s) =>
+                  s.id === subtaskId ? { ...s, done: !s.done } : s,
+                ),
+              }
+            : t,
+        ),
+      );
 
-  // ── Comment CRUD ──────────────────────────────────────────────────────────
+      // Find current done state to compute new value for PocketBase
+      const task = tasks.find((t) => t.id === taskId);
+      const subtask = task?.subtasks.find((s) => s.id === subtaskId);
+      const newDone = subtask ? !subtask.done : true;
+
+      pb.collection("subtasks")
+        .update(subtaskId, { done: newDone })
+        .catch(() => {});
+    },
+    [tasks],
+  );
+
+  // ── Comment CRUD ─────────────────────────────────────────────────────────
 
   const addComment = useCallback(
     (taskId: string, text: string, author: User): Comment => {
-      const newComment: Comment = {
-        id: `c-${Date.now()}`,
+      const tempId = `comment-${Date.now()}`;
+      const tempComment: Comment = {
+        id: tempId,
         taskId,
         author,
         text,
-        createdAt: "Just now",
+        createdAt: new Date().toISOString(),
       };
       setTasks((prev) =>
         prev.map((t) =>
-          t.id === taskId ? { ...t, comments: [...t.comments, newComment] } : t,
+          t.id === taskId
+            ? { ...t, comments: [...t.comments, tempComment] }
+            : t,
         ),
       );
-      return newComment;
+
+      pb.collection("comments")
+        .create(
+          {
+            text,
+            task: taskId,
+            author: author.id,
+          },
+          { expand: "author,mentions" },
+        )
+        .then((record) => {
+          const real = mapComment(record as unknown as PBComment);
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === taskId
+                ? {
+                    ...t,
+                    comments: t.comments.map((c) =>
+                      c.id === tempId ? real : c,
+                    ),
+                  }
+                : t,
+            ),
+          );
+        })
+        .catch(() => {
+          setTasks((prev) =>
+            prev.map((t) =>
+              t.id === taskId
+                ? { ...t, comments: t.comments.filter((c) => c.id !== tempId) }
+                : t,
+            ),
+          );
+        });
+
+      return tempComment;
     },
     [],
   );
@@ -392,15 +772,81 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
           : t,
       ),
     );
+    pb.collection("comments")
+      .delete(commentId)
+      .catch(() => {});
   }, []);
 
+  // ── EpicDoc CRUD ──────────────────────────────────────────────────────────
+
+  const createEpicDoc = useCallback(
+    (epicId: string, title: string, content: string, author: User): EpicDoc => {
+      const tempId = `doc-${Date.now()}`;
+      const tempDoc: EpicDoc = {
+        id: tempId,
+        epicId,
+        title,
+        content,
+        createdBy: author,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      setEpicDocs((prev) => [...prev, tempDoc]);
+
+      pb.collection("epic_docs")
+        .create(
+          { title, content, epic: epicId, created_by: author.id },
+          { expand: "created_by" },
+        )
+        .then((record) => {
+          const real = mapEpicDoc(record as unknown as PBEpicDoc);
+          setEpicDocs((prev) => prev.map((d) => (d.id === tempId ? real : d)));
+        })
+        .catch(() => {
+          setEpicDocs((prev) => prev.filter((d) => d.id !== tempId));
+        });
+
+      return tempDoc;
+    },
+    [],
+  );
+
+  const updateEpicDoc = useCallback(
+    (id: string, data: { title?: string; content?: string }) => {
+      setEpicDocs((prev) =>
+        prev.map((d) =>
+          d.id === id
+            ? { ...d, ...data, updatedAt: new Date().toISOString() }
+            : d,
+        ),
+      );
+      pb.collection("epic_docs")
+        .update(id, data)
+        .catch(() => {});
+    },
+    [],
+  );
+
+  const deleteEpicDoc = useCallback((id: string) => {
+    setEpicDocs((prev) => prev.filter((d) => d.id !== id));
+    pb.collection("epic_docs")
+      .delete(id)
+      .catch(() => {});
+  }, []);
 
   return (
     <DataStoreContext.Provider
       value={{
         goals,
         epics,
+        epicDocs,
         tasks,
+        users,
+        isLoading,
+        refreshUsers,
+        createEpicDoc,
+        updateEpicDoc,
+        deleteEpicDoc,
         addGoalKpi,
         updateGoalKpi,
         deleteGoalKpi,

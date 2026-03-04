@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { ChevronDown, ChevronRight } from "lucide-react";
+import { useDataStore } from "@/contexts/DataStore";
 import { TaskStatus, Task, Subtask } from "@/lib/types";
 import { TaskRow, SubtaskRow } from "@/components/my-work/WorkRow";
-import { TASKS } from "@/lib/mock";
 
 interface WorkSectionProps {
   status: TaskStatus;
@@ -14,6 +14,7 @@ interface WorkSectionProps {
 }
 
 export function WorkSection({ status, tasks, subtasks, defaultExpanded = true }: WorkSectionProps) {
+  const { tasks: allTasks } = useDataStore();
   const [expanded, setExpanded] = useState(defaultExpanded);
   const total = tasks.length + subtasks.length;
 
@@ -42,7 +43,7 @@ export function WorkSection({ status, tasks, subtasks, defaultExpanded = true }:
             <TaskRow key={task.id} task={task} />
           ))}
           {subtasks.map(({ subtask, parentTaskId }) => {
-            const parent = TASKS.find((t) => t.id === parentTaskId)!;
+            const parent = allTasks.find((t) => t.id === parentTaskId)!;
             return <SubtaskRow key={subtask.id} subtask={subtask} parentTask={parent} />;
           })}
         </div>
