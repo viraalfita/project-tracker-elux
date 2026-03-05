@@ -61,7 +61,12 @@ export function EpicDocsTab({ epicId, epic }: EpicDocsTabProps) {
 
   function handleSaveCreate() {
     if (!formTitle.trim() || !currentUser) return;
-    const doc = createEpicDoc(epicId, formTitle.trim(), formContent.trim(), currentUser);
+    const doc = createEpicDoc(
+      epicId,
+      formTitle.trim(),
+      formContent.trim(),
+      currentUser,
+    );
     toast(`Doc "${formTitle.trim()}" created.`);
     setActiveDocId(doc.id);
     handleCancelForm();
@@ -69,7 +74,10 @@ export function EpicDocsTab({ epicId, epic }: EpicDocsTabProps) {
 
   function handleSaveEdit() {
     if (!editingId || !formTitle.trim()) return;
-    updateEpicDoc(editingId, { title: formTitle.trim(), content: formContent.trim() });
+    updateEpicDoc(editingId, {
+      title: formTitle.trim(),
+      content: formContent.trim(),
+    });
     toast("Doc updated.");
     handleCancelForm();
   }
@@ -175,7 +183,9 @@ export function EpicDocsTab({ epicId, epic }: EpicDocsTabProps) {
         {/* Edit form */}
         {editingId && !isCreating && (
           <div className="space-y-3">
-            <h2 className="text-base font-semibold text-foreground">Edit Doc</h2>
+            <h2 className="text-base font-semibold text-foreground">
+              Edit Doc
+            </h2>
             <input
               type="text"
               value={formTitle}
@@ -213,7 +223,9 @@ export function EpicDocsTab({ epicId, epic }: EpicDocsTabProps) {
         {!isCreating && !editingId && activeDoc && (
           <div>
             <div className="flex items-start justify-between gap-4 mb-1">
-              <h2 className="text-lg font-bold text-foreground">{activeDoc.title}</h2>
+              <h2 className="text-lg font-bold text-foreground">
+                {activeDoc.title}
+              </h2>
               {canEdit && (
                 <div className="flex items-center gap-1 shrink-0">
                   <button
@@ -234,8 +246,7 @@ export function EpicDocsTab({ epicId, epic }: EpicDocsTabProps) {
               )}
             </div>
             <p className="text-xs text-muted-foreground mb-6">
-              By {activeDoc.createdBy.name} ·{" "}
-              {new Date(activeDoc.updatedAt).toLocaleDateString()}
+              By {activeDoc.createdBy.name}
             </p>
             <pre className="whitespace-pre-wrap text-sm text-foreground leading-relaxed font-sans">
               {activeDoc.content}
