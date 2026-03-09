@@ -20,6 +20,7 @@ import {
   PBTask,
   PBUser,
 } from "@/lib/pb-types";
+import { getEpicAllowedUserIds } from "@/lib/permissions";
 import { pb } from "@/lib/pocketbase";
 import {
   Comment,
@@ -63,6 +64,17 @@ interface DataStoreContextType {
     data: { title?: string; content?: string },
   ) => void;
   deleteEpicDoc: (id: string) => void;
+  // Goal CRUD
+  createGoal: (data: {
+    title: string;
+    description: string;
+    ownerId: string;
+  }) => void;
+  updateGoal: (
+    goalId: string,
+    data: { title: string; description: string },
+  ) => void;
+  deleteGoal: (goalId: string) => void;
   // Goal KPI operations
   addGoalKpi: (goalId: string, kpi: Omit<GoalKpi, "id">) => void;
   updateGoalKpi: (
@@ -102,10 +114,9 @@ interface DataStoreContextType {
   updateTask: (
     id: string,
     data: Partial<
-      Pick<Task, "title" | "description" | "status" | "priority">
+      Pick<Task, "title" | "description" | "status" | "priority" | "order">
     > & { assigneeId?: string },
   ) => void;
-  updateTaskWatchers: (taskId: string, watcherIds: string[]) => void;
   deleteTask: (id: string) => void;
   // Subtask CRUD
   createSubtask: (
@@ -181,7 +192,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
             expand: "owner,watchers",
           }),
           pb.collection("tasks").getFullList<PBTask>({
-            expand: "owner,assignee,watchers",
+            expand: "owner,assignee",
           }),
           pb.collection("goals").getFullList<PBGoal>({
             expand: "owner,linked_epics",
@@ -368,6 +379,56 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     [],
   );
 
+  const createGoal = useCallback(
+    (data: { title: string; description: string; ownerId: string }) => {
+      pb.collection("goals")
+        .create({
+          title: data.title,
+          description: data.description,
+          owner: data.ownerId,
+          linked_epics: [],
+        })
+        .then((record) => {
+          const owner = users.find((u) => u.id === data.ownerId);
+          if (!owner) return;
+          const newGoal: Goal = {
+            id: record.id,
+            title: data.title,
+            description: data.description,
+            owner,
+            kpis: [],
+            linkedEpicIds: [],
+          };
+          setGoals((prev) => [...prev, newGoal]);
+        })
+        .catch(() => {});
+    },
+    [users],
+  );
+
+  const updateGoal = useCallback(
+    (goalId: string, data: { title: string; description: string }) => {
+      setGoals((prev) =>
+        prev.map((g) =>
+          g.id === goalId
+            ? { ...g, title: data.title, description: data.description }
+            : g,
+        ),
+      );
+      pb.collection("goals")
+        .update(goalId, { title: data.title, description: data.description })
+        .catch(() => {});
+    },
+    [],
+  );
+
+  const deleteGoal = useCallback((goalId: string) => {
+    setGoals((prev) => prev.filter((g) => g.id !== goalId));
+    pb.collection("goals")
+      .delete(goalId)
+      .catch(() => {});
+  }, []);
+
   // ── Epic CRUD ────────────────────────────────────────────────────────────
 
   const createEpic = useCallback(
@@ -472,7 +533,18 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         }),
       );
       pb.collection("epics")
-        .update(epicId, { watchers: watcherIds })
+        .update(epicId, { watchers: watcherIds }, { expand: "owner,watchers" })
+        .then((record) => {
+          // Sync local state with what PocketBase actually persisted.
+          // If the schema had a single-select constraint, this reveals the
+          // truncation immediately rather than hiding it behind the optimistic update.
+          const confirmed = mapEpic(record as unknown as PBEpic);
+          setEpics((prev) =>
+            prev.map((e) =>
+              e.id === epicId ? { ...e, watchers: confirmed.watchers } : e,
+            ),
+          );
+        })
         .catch(() => {});
     },
     [users],
@@ -497,8 +569,16 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       priority?: Priority;
       assigneeId?: string;
     }): Task => {
-      const assignee = data.assigneeId
-        ? users.find((u) => u.id === data.assigneeId) || null
+      // Validate assigneeId: must be an epic member (owner or watcher)
+      const epic = epics.find((e) => e.id === data.epicId);
+      const allowedIds = epic ? getEpicAllowedUserIds(epic) : new Set<string>();
+      const safeAssigneeId =
+        data.assigneeId && allowedIds.has(data.assigneeId)
+          ? data.assigneeId
+          : undefined;
+
+      const assignee = safeAssigneeId
+        ? users.find((u) => u.id === safeAssigneeId) || null
         : null;
       const tempId = `task-${Date.now()}`;
       const tempTask: Task = {
@@ -508,7 +588,6 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         description: data.description ?? "",
         owner: assignee || undefined,
         assignee,
-        watchers: [],
         status: data.status ?? "To Do",
         priority: data.priority ?? "Medium",
         dueDate: "",
@@ -525,10 +604,10 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
             status: data.status ?? "To Do",
             priority: data.priority ?? "Medium",
             epic: data.epicId,
-            assignee: data.assigneeId ?? null,
-            owner: data.assigneeId ?? null,
+            assignee: safeAssigneeId ?? null,
+            owner: safeAssigneeId ?? null,
           },
-          { expand: "owner,assignee,watchers" },
+          { expand: "owner,assignee" },
         )
         .then((record) => {
           const real = mapTask(record as unknown as PBTask, [], []);
@@ -540,28 +619,49 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
 
       return tempTask;
     },
-    [users],
+    [users, epics],
   );
 
   const updateTask = useCallback(
     (
       id: string,
       data: Partial<
-        Pick<Task, "title" | "description" | "status" | "priority">
+        Pick<Task, "title" | "description" | "status" | "priority" | "order">
       > & { assigneeId?: string },
     ) => {
-      setTasks((prev) =>
-        prev.map((t) => {
+      // Compute a validated assigneeId by reading current tasks from functional state.
+      // safeAssigneeId is captured in a let so the PB write can reuse it.
+      let resolvedAssigneeId: string | undefined | null = data.assigneeId;
+
+      setTasks((prev) => {
+        if (data.assigneeId !== undefined && data.assigneeId !== "") {
+          const currentTask = prev.find((t) => t.id === id);
+          const epic = currentTask
+            ? epics.find((e) => e.id === currentTask.epicId)
+            : undefined;
+          const allowedIds = epic
+            ? getEpicAllowedUserIds(epic)
+            : new Set<string>();
+          if (!allowedIds.has(data.assigneeId)) {
+            // Invalid assignee — discard silently, keep existing
+            resolvedAssigneeId = undefined;
+          }
+        }
+
+        return prev.map((t) => {
           if (t.id !== id) return t;
           const updated = { ...t, ...data };
-          if (data.assigneeId !== undefined) {
-            updated.assignee = data.assigneeId
-              ? users.find((u) => u.id === data.assigneeId) || null
+          if (resolvedAssigneeId !== undefined) {
+            updated.assignee = resolvedAssigneeId
+              ? users.find((u) => u.id === resolvedAssigneeId) || null
               : null;
+          } else if (data.assigneeId !== undefined) {
+            // assigneeId was rejected — preserve existing assignee
+            updated.assignee = t.assignee;
           }
           return updated;
-        }),
-      );
+        });
+      });
 
       const payload: Record<string, unknown> = {};
       if (data.title !== undefined) payload.title = data.title;
@@ -569,30 +669,17 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         payload.description = data.description;
       if (data.status !== undefined) payload.status = data.status;
       if (data.priority !== undefined) payload.priority = data.priority;
-      if (data.assigneeId !== undefined)
-        payload.assignee = data.assigneeId || null;
+      if (data.order !== undefined) payload.order = data.order;
+      // Only persist a valid assigneeId (resolvedAssigneeId is set to undefined if invalid)
+      if (resolvedAssigneeId !== undefined) {
+        payload.assignee = resolvedAssigneeId || null;
+      }
 
       pb.collection("tasks")
         .update(id, payload)
         .catch(() => {});
     },
-    [users],
-  );
-
-  const updateTaskWatchers = useCallback(
-    (taskId: string, watcherIds: string[]) => {
-      setTasks((prev) =>
-        prev.map((t) => {
-          if (t.id !== taskId) return t;
-          const watchers = users.filter((u) => watcherIds.includes(u.id));
-          return { ...t, watchers };
-        }),
-      );
-      pb.collection("tasks")
-        .update(taskId, { watchers: watcherIds })
-        .catch(() => {});
-    },
-    [users],
+    [users, epics],
   );
 
   const deleteTask = useCallback((id: string) => {
@@ -847,6 +934,9 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         createEpicDoc,
         updateEpicDoc,
         deleteEpicDoc,
+        createGoal,
+        updateGoal,
+        deleteGoal,
         addGoalKpi,
         updateGoalKpi,
         deleteGoalKpi,
@@ -857,7 +947,6 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         deleteEpic,
         createTask,
         updateTask,
-        updateTaskWatchers,
         deleteTask,
         createSubtask,
         deleteSubtask,

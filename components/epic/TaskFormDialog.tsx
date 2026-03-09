@@ -36,6 +36,7 @@ export function TaskFormDialog({
   const isEdit = !!task;
   const [title, setTitle] = useState(task?.title ?? "");
   const [description, setDescription] = useState(task?.description ?? "");
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [status, setStatus] = useState<TaskStatus>(task?.status ?? "To Do");
   const [priority, setPriority] = useState<Priority>(
     task?.priority ?? "Medium",
@@ -54,12 +55,16 @@ export function TaskFormDialog({
       setStatus(task?.status ?? "To Do");
       setPriority(task?.priority ?? "Medium");
       setAssignee(task?.assignee ?? null);
+      setErrors({});
     }
   }, [open, task]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim()) return;
+    const newErrors: Record<string, string> = {};
+    if (!title.trim()) newErrors.title = "Task title is required";
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
     if (isEdit && task) {
       updateTask(task.id, {
@@ -110,11 +115,12 @@ export function TaskFormDialog({
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors((p) => ({ ...p, title: "" })); }}
                 placeholder="e.g. Implement OAuth callback handler"
-                className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`w-full rounded-md border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.title ? "border-red-400" : "border-border"}`}
                 autoFocus
               />
+              {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
             </div>
 
             <div>
@@ -207,8 +213,7 @@ export function TaskFormDialog({
               </button>
               <button
                 type="submit"
-                disabled={!title.trim()}
-                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="rounded-md bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
               >
                 {isEdit ? "Save Changes" : "Create Task"}
               </button>

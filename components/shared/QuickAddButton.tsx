@@ -4,7 +4,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
 import { canCreate } from "@/lib/permissions";
-import { Plus, X } from "lucide-react";
+import { AlertCircle, Plus, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface QuickAddButtonProps {
@@ -18,6 +18,7 @@ export function QuickAddButton({ contextEpicId }: QuickAddButtonProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [title, setTitle] = useState("");
   const [selectedEpicId, setSelectedEpicId] = useState(contextEpicId || "");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Update epic selection when context changes
   useEffect(() => {
@@ -59,23 +60,22 @@ export function QuickAddButton({ contextEpicId }: QuickAddButtonProps) {
   function handleClose() {
     setIsOpen(false);
     setTitle("");
+    setErrors({});
   }
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
 
-    if (!title.trim()) {
-      toast("Task title is required", "error");
-      return;
-    }
-
-    if (!selectedEpicId) {
-      toast("Please select an epic", "error");
+    const newErrors: Record<string, string> = {};
+    if (!title.trim()) newErrors.title = "Task title is required";
+    if (!selectedEpicId) newErrors.epic = "Please select an epic";
+    if (Object.keys(newErrors).length > 0) {
+      setErrors(newErrors);
       return;
     }
 
     if (!canCreateTask) {
-      toast("You don't have permission to create tasks", "error");
+      toast("You don't have permission to create tasks in this epic", "error");
       return;
     }
 
@@ -152,11 +152,17 @@ export function QuickAddButton({ contextEpicId }: QuickAddButtonProps) {
                 <input
                   type="text"
                   value={title}
-                  onChange={(e) => setTitle(e.target.value)}
+                  onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors((p) => ({ ...p, title: "" })); }}
                   placeholder="What needs to be done?"
                   autoFocus
-                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full rounded-md border bg-white px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.title ? "border-red-400" : "border-border"}`}
                 />
+                {errors.title && (
+                  <p className="flex items-center gap-1 text-xs text-red-600 mt-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    {errors.title}
+                  </p>
+                )}
               </div>
 
               {/* Epic selector */}
@@ -166,8 +172,8 @@ export function QuickAddButton({ contextEpicId }: QuickAddButtonProps) {
                 </label>
                 <select
                   value={selectedEpicId}
-                  onChange={(e) => setSelectedEpicId(e.target.value)}
-                  className="w-full rounded-md border border-border bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  onChange={(e) => { setSelectedEpicId(e.target.value); if (errors.epic) setErrors((p) => ({ ...p, epic: "" })); }}
+                  className={`w-full rounded-md border bg-white px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.epic ? "border-red-400" : "border-border"}`}
                 >
                   <option value="">Select epic...</option>
                   {availableEpics.map((epic) => (
@@ -176,6 +182,12 @@ export function QuickAddButton({ contextEpicId }: QuickAddButtonProps) {
                     </option>
                   ))}
                 </select>
+                {errors.epic && (
+                  <p className="flex items-center gap-1 text-xs text-red-600 mt-1">
+                    <AlertCircle className="h-3 w-3 shrink-0" />
+                    {errors.epic}
+                  </p>
+                )}
                 {contextEpicId && (
                   <p className="text-xs text-muted-foreground mt-1">
                     Pre-filled from current page
@@ -194,7 +206,8 @@ export function QuickAddButton({ contextEpicId }: QuickAddButtonProps) {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  disabled={!title.trim() || !selectedEpicId}
+                  className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Create Task
                 </button>

@@ -27,7 +27,7 @@ export default function MyWorkPage() {
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
   const [showFilters, setShowFilters] = useState(false);
 
-  const NOW = useMemo(() => new Date("2026-02-10"), []);
+  const NOW = useMemo(() => new Date(), []);
   const WEEK_END = useMemo(
     () => new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000),
     [NOW],
@@ -114,12 +114,7 @@ export default function MyWorkPage() {
     <div className="flex flex-col h-full">
       {/* Top bar */}
       <div className="border-b border-border bg-white px-6 py-4">
-        <Breadcrumbs
-          items={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "My Work" },
-          ]}
-        />
+        <Breadcrumbs items={[{ label: "My Work" }]} />
       </div>
 
       <div className="flex-1 px-6 py-6">
@@ -255,6 +250,12 @@ export default function MyWorkPage() {
           <div className="rounded-lg border border-dashed border-border py-16 text-center">
             <p className="text-muted-foreground text-sm">
               Nothing assigned to you yet.
+            </p>
+          </div>
+        ) : myTasks.length > 0 && myTasks.every((t) => t.status === "Done") && activeFilterCount === 0 ? (
+          <div className="rounded-lg border border-dashed border-green-200 bg-green-50/50 py-16 text-center">
+            <p className="text-green-700 font-medium text-sm">
+              No tasks in progress. You&apos;re all caught up! 🎉
             </p>
           </div>
         ) : myTasks.length === 0 && activeFilterCount > 0 ? (

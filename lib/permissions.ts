@@ -8,7 +8,7 @@ import { Epic, Task, User } from "./types";
 // - Owner: the user who created the epic (permanent, cannot be transferred).
 // - Watchers: users explicitly added by the owner to collaborate on the epic.
 // - Admin has full access to all epics and tasks, regardless of ownership.
-// - Any authenticated user can create a new epic or manage their own goals.
+// - Admin and Manager can create new epics. Only Admin can manage goals.
 // - Roles (Admin/Manager/Member/Viewer) do NOT gate epic or task access.
 //
 // Helpers accept `epic: Epic` (the full epic object) so that ownership and
@@ -44,10 +44,11 @@ export function canViewEpic(user: User | null, epic: Epic): boolean {
 
 /**
  * Returns true if the user can create a new Epic at the workspace level.
- * Any logged-in user may create an Epic; they become the owner automatically.
+ * Only Admin and Manager roles may create Epics.
  */
 export function canManageEpics(user: User | null): boolean {
-  return !!user;
+  if (!user) return false;
+  return isAdmin(user) || user.role === "Manager";
 }
 
 /**
@@ -65,6 +66,17 @@ export function canCreate(user: User | null, epic?: Epic): boolean {
  */
 export function canEdit(user: User | null, epic?: Epic): boolean {
   return canCreate(user, epic);
+}
+
+/**
+ * Returns true if the user can edit the epic's own metadata (title, description,
+ * status, dates). Only Admin and Manager roles may edit epic metadata.
+ * Members and Viewers are not allowed, even if they are watchers.
+ */
+export function canEditEpicMeta(user: User | null, epic?: Epic): boolean {
+  if (!user || !epic) return false;
+  if (isAdmin(user)) return true;
+  return user.role === "Manager" && isEpicMember(user, epic);
 }
 
 /**
@@ -113,18 +125,19 @@ export function canComment(user: User | null, epic?: Epic): boolean {
 
 /**
  * Returns the IDs of users that can be assigned to tasks/subtasks.
- * - Admin and epic members (owner + watchers): all workspace users.
- * - Non-members / unauthenticated: empty array.
+ * Only users who are members of the epic (owner + watchers) are assignable.
+ * This ensures non-members cannot be assigned to tasks in an epic they can't access.
  */
 export function getAssignableUsers(
   user: User | null,
   epic: Epic | undefined,
   allUsers: User[] = [],
 ): string[] {
-  if (!user) return [];
-  if (isAdmin(user)) return allUsers.map((u) => u.id);
-  if (!epic || !isEpicMember(user, epic)) return [];
-  return allUsers.map((u) => u.id);
+  if (!user || !epic) return [];
+  if (!isEpicMember(user, epic)) return [];
+  // Restrict to epic members: owner + watchers
+  const epicMemberIds = new Set(getEpicAllowedUserIds(epic));
+  return allUsers.filter((u) => epicMemberIds.has(u.id)).map((u) => u.id);
 }
 
 /**
@@ -147,11 +160,20 @@ export function canManageWatchers(user: User | null, epic?: Epic): boolean {
 }
 
 /**
+ * Returns true if the user can create, edit, or delete Goals and their KPIs.
+ * Only Admin can manage goals.
+ */
+export function canManageGoal(user: User | null): boolean {
+  return isAdmin(user);
+}
+
+/**
  * Returns true if the user can link or unlink Epics on a Goal.
- * Any logged-in user can manage goal links.
+ * Only Admin can manage goal links.
+ * @deprecated Use canManageGoal instead.
  */
 export function canManageGoalLinks(user: User | null): boolean {
-  return !!user;
+  return canManageGoal(user);
 }
 
 /**

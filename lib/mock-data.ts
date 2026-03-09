@@ -8,7 +8,6 @@ function enrichTask(task: Partial<Task>, USERS: User[]): Task {
   return {
     ...task,
     owner: task.owner || task.assignee || USERS[0],
-    watchers: task.watchers || [],
   } as Task;
 }
 
@@ -76,7 +75,6 @@ export function generateComprehensiveTasks(USERS: User[]): Task[] {
         },
       ],
       owner: USERS[2], // Frontend Dev
-      watchers: [USERS[0], USERS[1]], // Admin, Manager
     },
     {
       id: "t2",

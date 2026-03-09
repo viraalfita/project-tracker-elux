@@ -32,14 +32,13 @@ export interface PBTask extends RecordModel {
   priority: string;
   due_date: string;
   estimate: number;
+  order: number;
   epic: string;
   owner: string;
   assignee: string;
-  watchers: string | string[];
   expand?: {
     owner?: PBUser;
     assignee?: PBUser;
-    watchers?: PBUser | PBUser[];
   };
 }
 

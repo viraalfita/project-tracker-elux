@@ -46,7 +46,7 @@ export default function EpicPage({ params }: EpicPageProps) {
       <div className="border-b border-border bg-white px-6 py-4">
         <Breadcrumbs
           items={[
-            { label: "Dashboard", href: "/dashboard" },
+            { label: "Epics", href: "/epics" },
             { label: epic.title },
           ]}
         />

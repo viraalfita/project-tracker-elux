@@ -1,6 +1,7 @@
 import { AppShell } from "@/components/layout/AppShell";
 import { AuthProvider } from "@/contexts/AuthContext";
 import { DataStoreProvider } from "@/contexts/DataStore";
+import { NotificationProvider } from "@/contexts/NotificationContext";
 import { ToastProvider } from "@/contexts/ToastContext";
 import type { Metadata } from "next";
 import { Geist } from "next/font/google";
@@ -23,9 +24,11 @@ export default function RootLayout({
       <body className={geist.className}>
         <AuthProvider>
           <DataStoreProvider>
-            <ToastProvider>
-              <AppShell>{children}</AppShell>
-            </ToastProvider>
+            <NotificationProvider>
+              <ToastProvider>
+                <AppShell>{children}</AppShell>
+              </ToastProvider>
+            </NotificationProvider>
           </DataStoreProvider>
         </AuthProvider>
       </body>

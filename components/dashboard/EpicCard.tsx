@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
-import { canEdit, isAdmin } from "@/lib/permissions";
+import { canEditEpicMeta, isAdmin } from "@/lib/permissions";
 import { getTaskProgress } from "@/lib/utils";
 import { Epic } from "@/lib/types";
 import { CalendarDays, ChevronRight, Pencil, Trash2 } from "lucide-react";
@@ -34,7 +34,7 @@ export function EpicCard({ epic }: EpicCardProps) {
     liveTasks.reduce((sum, t) => sum + getTaskProgress(t), 0) / liveTasks.length
   );
 
-  const allowEdit = canEdit(currentUser, epic);
+  const allowEdit = canEditEpicMeta(currentUser, epic);
   // Epic deletion is restricted to owner + Admin
   const allowDelete =
     isAdmin(currentUser) || currentUser?.id === epic.owner.id;

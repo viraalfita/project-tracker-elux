@@ -1,12 +1,13 @@
 "use client";
 
+import { GoalFormDialog } from "@/components/goal/GoalFormDialog";
 import { KpiEditDialog } from "@/components/goal/KpiEditDialog";
 import { LinkEpicModal } from "@/components/goal/LinkEpicModal";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { canManageGoalLinks } from "@/lib/permissions";
+import { canManageGoal } from "@/lib/permissions";
 import { Epic, Goal, GoalKpi, GoalStatus, Task } from "@/lib/types";
 import {
   AlertTriangle,
@@ -27,7 +28,7 @@ interface GoalPageProps {
   params: Promise<{ goalId: string }>;
 }
 
-const NOW = new Date("2026-02-10");
+const NOW = new Date();
 
 function epicIsAtRisk(epic: Epic, tasks: Task[]): boolean {
   const epicTasks = tasks.filter((t) => t.epicId === epic.id);
@@ -77,6 +78,7 @@ export default function GoalPage({ params }: GoalPageProps) {
   } = useDataStore();
   const { currentUser } = useAuth();
   const [showLinkModal, setShowLinkModal] = useState(false);
+  const [showEditGoal, setShowEditGoal] = useState(false);
   const [kpiDialog, setKpiDialog] = useState<{
     open: boolean;
     kpi?: GoalKpi | null;
@@ -85,7 +87,7 @@ export default function GoalPage({ params }: GoalPageProps) {
   const goal = goals.find((g) => g.id === goalId);
   if (!goal) notFound();
 
-  const canManage = canManageGoalLinks(currentUser);
+  const canManage = canManageGoal(currentUser);
   const goalStatus = deriveGoalStatus(goal, epics, tasks);
   const GoalStatusIcon = GOAL_STATUS_ICONS[goalStatus];
   const linkedEpics = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
@@ -130,12 +132,23 @@ export default function GoalPage({ params }: GoalPageProps) {
                 </p>
               </div>
             </div>
-            <span
-              className={`inline-flex flex-shrink-0 items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${GOAL_STATUS_STYLES[goalStatus]}`}
-            >
-              <GoalStatusIcon className="h-3.5 w-3.5" />
-              {goalStatus}
-            </span>
+            <div className="flex items-center gap-2 shrink-0">
+              {canManage && (
+                <button
+                  onClick={() => setShowEditGoal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-md border border-border bg-white px-3 py-1.5 text-xs font-medium text-foreground hover:bg-accent transition-colors"
+                >
+                  <Pencil className="h-3 w-3" />
+                  Edit
+                </button>
+              )}
+              <span
+                className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${GOAL_STATUS_STYLES[goalStatus]}`}
+              >
+                <GoalStatusIcon className="h-3.5 w-3.5" />
+                {goalStatus}
+              </span>
+            </div>
           </div>
 
           {/* Owner */}
@@ -374,6 +387,12 @@ export default function GoalPage({ params }: GoalPageProps) {
           </div>
         </div>
       </div>
+
+      <GoalFormDialog
+        open={showEditGoal}
+        onClose={() => setShowEditGoal(false)}
+        goal={goal}
+      />
 
       <LinkEpicModal
         open={showLinkModal}

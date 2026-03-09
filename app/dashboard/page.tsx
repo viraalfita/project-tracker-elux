@@ -26,13 +26,38 @@ export default function DashboardPage() {
   // ── Epic KPI filter ────────────────────────────────────────────────────────
   const [kpiEpicFilter, setKpiEpicFilter] = useState("");
 
-  const NOW = new Date("2026-02-10");
+  const NOW = new Date();
+  const isManager = currentUser?.role === "Manager";
+  const isManagementView =
+    currentUser?.role === "Admin" || currentUser?.role === "Manager";
+
+  // For Managers, scope to only epics they own
+  const scopedEpics = useMemo(
+    () =>
+      isManager
+        ? epics.filter((e) => e.owner.id === currentUser?.id)
+        : epics,
+    [epics, isManager, currentUser],
+  );
+
+  const scopedEpicIds = useMemo(
+    () => new Set(scopedEpics.map((e) => e.id)),
+    [scopedEpics],
+  );
+
+  const scopedTasks = useMemo(
+    () =>
+      isManager ? tasks.filter((t) => scopedEpicIds.has(t.epicId)) : tasks,
+    [tasks, isManager, scopedEpicIds],
+  );
 
   // Filtered tasks for KPI metrics
   const kpiTasks = useMemo(
     () =>
-      kpiEpicFilter ? tasks.filter((t) => t.epicId === kpiEpicFilter) : tasks,
-    [tasks, kpiEpicFilter],
+      kpiEpicFilter
+        ? scopedTasks.filter((t) => t.epicId === kpiEpicFilter)
+        : scopedTasks,
+    [scopedTasks, kpiEpicFilter],
   );
 
   // Task metrics
@@ -54,7 +79,10 @@ export default function DashboardPage() {
   }).length;
 
   // Team Workload using idle resource model (In Progress task count)
-  const workload = useMemo(() => calculateTeamWorkload(users, tasks), [users, tasks]);
+  const workload = useMemo(
+    () => calculateTeamWorkload(users, scopedTasks),
+    [users, scopedTasks],
+  );
 
   const overloadedCount = workload.filter(
     (w) => w.status === "Overloaded",
@@ -64,11 +92,15 @@ export default function DashboardPage() {
   ).length;
 
   // Epic health (for EWS)
-  const epicHealth = epics.map((epic) => {
+  const epicHealth = scopedEpics.map((epic) => {
     const epicTasks = kpiTasks.filter((t) => t.epicId === epic.id);
-    const progress = epicTasks.length === 0 ? 0 : Math.round(
-      epicTasks.reduce((sum, t) => sum + getTaskProgress(t), 0) / epicTasks.length
-    );
+    const progress =
+      epicTasks.length === 0
+        ? 0
+        : Math.round(
+            epicTasks.reduce((sum, t) => sum + getTaskProgress(t), 0) /
+              epicTasks.length,
+          );
     const overdue = epicTasks.filter((t) => {
       const due = new Date(t.dueDate);
       return due < NOW && t.status !== "Done";
@@ -88,7 +120,7 @@ export default function DashboardPage() {
       </div>
 
       <div className="flex-1 px-6 py-6 space-y-6 overflow-auto">
-        {currentUser && currentUser.role === "Admin" ? (
+        {currentUser && isManagementView ? (
           // ═══════════════════════════════════════════════════════════════════
           // MONITORING DASHBOARD (Admin / Manager)
           // ═══════════════════════════════════════════════════════════════════
@@ -123,7 +155,7 @@ export default function DashboardPage() {
                       className="rounded border border-border bg-white px-2.5 py-1 text-xs text-foreground focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500"
                     >
                       <option value="">All Epics</option>
-                      {epics.map((e) => (
+                      {scopedEpics.map((e) => (
                         <option key={e.id} value={e.id}>
                           {e.title}
                         </option>
@@ -133,7 +165,7 @@ export default function DashboardPage() {
 
                   {/* Export KPI CSV button */}
                   <button
-                    onClick={() => downloadKpiCsv(kpiTasks, epics)}
+                    onClick={() => downloadKpiCsv(kpiTasks, scopedEpics)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded border border-indigo-200 bg-indigo-50 text-indigo-700 text-xs font-medium hover:bg-indigo-100 transition-colors"
                   >
                     <Download className="h-3.5 w-3.5" />
@@ -391,7 +423,7 @@ export default function DashboardPage() {
                     Browse Epics
                   </p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {epics.length} total
+                    {scopedEpics.length} total
                   </p>
                 </Link>
                 <Link

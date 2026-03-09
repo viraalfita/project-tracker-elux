@@ -18,7 +18,7 @@ export const USERS: User[] = [
   {
     id: "u2",
     name: "Lintang",
-    email: "lintang@inboxkitten.com",
+    email: "lintang@elux.space",
     initials: "LI",
     avatarColor: "#3b82f6",
     role: "Manager",
@@ -27,7 +27,7 @@ export const USERS: User[] = [
   {
     id: "u3",
     name: "Dewi",
-    email: "dewi@inboxkitten.com",
+    email: "dewi@elux.space",
     initials: "DW",
     avatarColor: "#10b981",
     role: "Manager",
@@ -36,7 +36,7 @@ export const USERS: User[] = [
   {
     id: "u4",
     name: "Ahrasya",
-    email: "ahrasya@inboxkitten.com",
+    email: "ahrasya@elux.space",
     initials: "AH",
     avatarColor: "#f59e0b",
     role: "Manager",
@@ -45,7 +45,7 @@ export const USERS: User[] = [
   {
     id: "u5",
     name: "Vira",
-    email: "vira@inboxkitten.com",
+    email: "vira@elux.space",
     initials: "VI",
     avatarColor: "#ec4899",
     role: "Member",
@@ -54,7 +54,7 @@ export const USERS: User[] = [
   {
     id: "u6",
     name: "Aurel",
-    email: "aurel@inboxkitten.com",
+    email: "aurelia@elux.space",
     initials: "AU",
     avatarColor: "#8b5cf6",
     role: "Member",

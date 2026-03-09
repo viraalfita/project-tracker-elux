@@ -9,18 +9,24 @@ import {
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
 import { KanbanColumn } from "@/components/board/KanbanColumn";
 import { TaskCard } from "@/components/board/TaskCard";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { EmptyState } from "@/components/shared/EmptyState";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { isUserInvolvedInEpic } from "@/lib/permissions";
 import { TaskStatus } from "@/lib/types";
-import { ChevronDown, Filter, Kanban, Users, X } from "lucide-react";
+import { ArrowUpDown, ChevronDown, Filter, Kanban, LayoutGrid, Users, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const COLUMNS: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 const ALL_STATUSES: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
+
+type SortBy = "" | "due-date-asc" | "due-date-desc" | "priority-high" | "priority-low" | "assignee" | "created-desc";
+
+const PRIORITY_ORDER: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
 
 export default function BoardPage() {
   const { tasks, epics: allEpics, users, updateTask } = useDataStore();
@@ -51,9 +57,11 @@ export default function BoardPage() {
     [activeTaskId, tasks],
   );
 
-  // Only Admin and Member can drag-and-drop
+  // Admin, Manager, and Member can drag-and-drop
   const canDragDrop =
-    currentUser?.role === "Admin" || currentUser?.role === "Member";
+    currentUser?.role === "Admin" ||
+    currentUser?.role === "Manager" ||
+    currentUser?.role === "Member";
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -68,15 +76,53 @@ export default function BoardPage() {
   function handleDragEnd(event: DragEndEvent) {
     const { active, over } = event;
     setActiveTaskId(null);
+    if (!over) return;
 
-    if (!over) return; // dropped outside any column
+    const draggedTaskId = active.id as string;
+    const overId = over.id as string;
 
-    const taskId = active.id as string;
-    const newStatus = over.id as TaskStatus;
-    const task = tasks.find((t) => t.id === taskId);
+    const draggedTask = tasks.find((t) => t.id === draggedTaskId);
+    if (!draggedTask) return;
 
-    if (task && task.status !== newStatus) {
-      updateTask(taskId, { status: newStatus });
+    // Determine target status: if dropping over a column header id, use it;
+    // otherwise the over item is a task — inherit its status.
+    const isColumnId = (COLUMNS as string[]).includes(overId);
+    const targetStatus: TaskStatus = isColumnId
+      ? (overId as TaskStatus)
+      : (tasks.find((t) => t.id === overId)?.status ?? draggedTask.status);
+
+    // Get all tasks in the target column, ordered
+    const columnTasks = tasks
+      .filter((t) => t.status === targetStatus)
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+
+    if (draggedTask.status === targetStatus) {
+      // Same-column reorder
+      const oldIndex = columnTasks.findIndex((t) => t.id === draggedTaskId);
+      const newIndex = isColumnId
+        ? columnTasks.length - 1
+        : columnTasks.findIndex((t) => t.id === overId);
+
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+      const reordered = arrayMove(columnTasks, oldIndex, newIndex);
+      reordered.forEach((t, i) => {
+        updateTask(t.id, { order: i });
+      });
+    } else {
+      // Cross-column move: update status + insert at position
+      const overIndex = isColumnId
+        ? columnTasks.length
+        : columnTasks.findIndex((t) => t.id === overId);
+      const insertAt = overIndex === -1 ? columnTasks.length : overIndex;
+
+      // Shift existing tasks in target column to make room
+      columnTasks.forEach((t, i) => {
+        if (i >= insertAt) {
+          updateTask(t.id, { order: i + 1 });
+        }
+      });
+      updateTask(draggedTaskId, { status: targetStatus, order: insertAt });
     }
   }
 
@@ -87,6 +133,7 @@ export default function BoardPage() {
   const [dueDateFilter, setDueDateFilter] = useState<
     "overdue" | "this-week" | ""
   >("");
+  const [sortBy, setSortBy] = useState<SortBy>("");
   const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
   const [showAssigneeDropdown, setShowAssigneeDropdown] = useState(false);
   const assigneeDropdownRef = useRef<HTMLDivElement>(null);
@@ -107,7 +154,7 @@ export default function BoardPage() {
 
   // ── Filtered view ──────────────────────────────────────────────────────────
   function getWeekEnd() {
-    const today = new Date("2026-02-10");
+    const today = new Date();
     const day = today.getDay();
     const mondayOffset = day === 0 ? -6 : 1 - day;
     const monday = new Date(today);
@@ -118,7 +165,7 @@ export default function BoardPage() {
   }
 
   const filteredTasks = useMemo(() => {
-    const NOW = new Date("2026-02-10");
+    const NOW = new Date();
     // Non-admin users only see tasks from epics they're involved in
     let result =
       currentUser?.role !== "Admin"
@@ -185,18 +232,14 @@ export default function BoardPage() {
     setEpicFilter("");
     setDueDateFilter("");
     setAssigneeFilter([]);
+    // sortBy is intentionally kept when clearing filters
   }
 
   return (
     <div className="flex flex-col h-full">
       {/* Top bar */}
       <div className="border-b border-border bg-white px-6 py-4">
-        <Breadcrumbs
-          items={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Board" },
-          ]}
-        />
+        <Breadcrumbs items={[{ label: "Board" }]} />
       </div>
 
       <div className="flex flex-col flex-1 px-6 py-5">
@@ -342,6 +385,27 @@ export default function BoardPage() {
             )}
           </div>
 
+          {/* Sort */}
+          <div className="flex items-center gap-1.5 ml-auto">
+            <ArrowUpDown className="h-3.5 w-3.5 text-muted-foreground" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortBy)}
+              className={`rounded border px-2.5 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 ${
+                sortBy
+                  ? "border-indigo-500 bg-indigo-50 text-indigo-700"
+                  : "border-border bg-white text-foreground"
+              }`}
+            >
+              <option value="">Sort: Manual</option>
+              <option value="due-date-asc">Due date ↑</option>
+              <option value="due-date-desc">Due date ↓</option>
+              <option value="priority-high">Priority: High first</option>
+              <option value="priority-low">Priority: Low first</option>
+              <option value="assignee">Assignee A→Z</option>
+            </select>
+          </div>
+
           {/* Clear filters */}
           {hasFilters && (
             <button
@@ -355,6 +419,24 @@ export default function BoardPage() {
         </div>
 
         {/* Kanban grid */}
+        {filteredTasks.length === 0 && !hasFilters ? (
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState
+              icon={LayoutGrid}
+              title="No tasks yet"
+              description="Tasks will appear here once they are created inside an epic."
+            />
+          </div>
+        ) : filteredTasks.length === 0 && hasFilters ? (
+          <div className="flex-1 flex items-center justify-center">
+            <EmptyState
+              icon={Filter}
+              title="No tasks match your filters"
+              description="Try adjusting or clearing the filters above."
+              action={{ label: "Clear filters", onClick: clearFilters }}
+            />
+          </div>
+        ) : (
         <DndContext
           sensors={sensors}
           onDragStart={handleDragStart}
@@ -365,7 +447,18 @@ export default function BoardPage() {
               <KanbanColumn
                 key={status}
                 status={status}
-                tasks={filteredTasks.filter((t) => t.status === status)}
+                tasks={filteredTasks.filter((t) => t.status === status).sort((a, b) => {
+                  if (!sortBy) return (a.order ?? 0) - (b.order ?? 0);
+                  switch (sortBy) {
+                    case "due-date-asc": return (a.dueDate || "9999") < (b.dueDate || "9999") ? -1 : 1;
+                    case "due-date-desc": return (a.dueDate || "0000") > (b.dueDate || "0000") ? -1 : 1;
+                    case "priority-high": return (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);
+                    case "priority-low": return (PRIORITY_ORDER[b.priority] ?? 1) - (PRIORITY_ORDER[a.priority] ?? 1);
+                    case "assignee": return (a.assignee?.name ?? "zzz").localeCompare(b.assignee?.name ?? "zzz");
+                    case "created-desc": return 0; // tasks don't carry createdAt yet; falls back to order
+                    default: return (a.order ?? 0) - (b.order ?? 0);
+                  }
+                })}
                 canDragDrop={canDragDrop}
               />
             ))}
@@ -379,6 +472,7 @@ export default function BoardPage() {
             ) : null}
           </DragOverlay>
         </DndContext>
+        )}
       </div>
     </div>
   );

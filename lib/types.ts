@@ -51,11 +51,11 @@ export interface Task {
   description: string;
   owner?: User;
   assignee: User | null;
-  watchers: User[];
   status: TaskStatus;
   priority: Priority;
   dueDate: string;
   estimate?: number;
+  order?: number;
   subtasks: Subtask[];
   comments: Comment[];
 }
@@ -83,6 +83,18 @@ export interface EpicDoc {
 }
 
 export type GoalStatus = "On Track" | "At Risk" | "Completed";
+
+export type InviteStatus = "pending" | "accepted" | "expired";
+
+export interface Invite {
+  id: string;
+  email: string;
+  role: Role;
+  invitedBy: User;
+  status: InviteStatus;
+  expiresAt: string;
+  created: string;
+}
 
 export interface GoalKpi {
   id: string;

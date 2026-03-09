@@ -97,9 +97,9 @@ export function mapTask(
     priority: (r.priority ?? "Medium") as Priority,
     dueDate: r.due_date ? r.due_date.split(" ")[0] : "",
     estimate: r.estimate ?? undefined,
+    order: r.order ?? 0,
     owner: r.expand?.owner ? mapUser(r.expand.owner) : undefined,
     assignee: r.expand?.assignee ? mapUser(r.expand.assignee) : null,
-    watchers: ensureArray(r.expand?.watchers).map(mapUser),
     subtasks,
     comments,
   };

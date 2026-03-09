@@ -40,7 +40,7 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
   );
   const [startDate, setStartDate] = useState(epic?.startDate ?? "");
   const [endDate, setEndDate] = useState(epic?.endDate ?? "");
-  const [dateError, setDateError] = useState("");
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   // Sync form when epic prop changes (switching between edit targets)
   useEffect(() => {
@@ -50,20 +50,20 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
       setStatus(epic?.status ?? "Not Started");
       setStartDate(epic?.startDate ?? "");
       setEndDate(epic?.endDate ?? "");
-      setDateError("");
+      setErrors({});
     }
   }, [open, epic]);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!title.trim() || !currentUser) return;
+    if (!currentUser) return;
 
-    // Validate date range
-    if (startDate && endDate && endDate < startDate) {
-      setDateError("End Date cannot be earlier than Start Date.");
-      return;
-    }
-    setDateError("");
+    const newErrors: Record<string, string> = {};
+    if (!title.trim()) newErrors.title = "Epic title is required";
+    if (startDate && endDate && endDate < startDate)
+      newErrors.endDate = "End date must be after start date";
+    setErrors(newErrors);
+    if (Object.keys(newErrors).length > 0) return;
 
     if (isEdit && epic) {
       updateEpic(epic.id, {
@@ -114,11 +114,12 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
               <input
                 type="text"
                 value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                onChange={(e) => { setTitle(e.target.value); if (errors.title) setErrors((p) => ({ ...p, title: "" })); }}
                 placeholder="e.g. Authentication Overhaul"
-                className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className={`w-full rounded-md border px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.title ? "border-red-400" : "border-border"}`}
                 autoFocus
               />
+              {errors.title && <p className="text-xs text-red-500 mt-1">{errors.title}</p>}
             </div>
 
             <div>
@@ -174,7 +175,7 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
                   value={startDate}
                   onChange={(e) => {
                     setStartDate(e.target.value);
-                    setDateError("");
+                    if (errors.endDate) setErrors((p) => ({ ...p, endDate: "" }));
                   }}
                   className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
@@ -188,16 +189,13 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
                   value={endDate}
                   onChange={(e) => {
                     setEndDate(e.target.value);
-                    setDateError("");
+                    if (errors.endDate) setErrors((p) => ({ ...p, endDate: "" }));
                   }}
-                  className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className={`w-full rounded-md border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 ${errors.endDate ? "border-red-400" : "border-border"}`}
                 />
+                {errors.endDate && <p className="text-xs text-red-500 mt-1">{errors.endDate}</p>}
               </div>
             </div>
-            {dateError && (
-              <p className="text-xs text-red-500 -mt-2">{dateError}</p>
-            )}
-
             <div className="flex gap-2 justify-end pt-2">
               <button
                 type="button"
@@ -208,8 +206,7 @@ export function EpicFormDialog({ open, onClose, epic }: EpicFormDialogProps) {
               </button>
               <button
                 type="submit"
-                disabled={!title.trim()}
-                className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                className="rounded-md bg-indigo-600 px-4 py-1.5 text-sm font-medium text-white hover:bg-indigo-700 transition-colors"
               >
                 {isEdit ? "Save Changes" : "Create Epic"}
               </button>

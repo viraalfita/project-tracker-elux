@@ -263,6 +263,17 @@ async function applyAccessRules() {
         deleteRule: authed,
       },
     },
+    {
+      // Invites are Admin-only. Updates are server-side only (empty string = superuser only).
+      name: "invites",
+      rules: {
+        listRule: '@request.auth.id != "" && @request.auth.role = "Admin"',
+        viewRule: '@request.auth.id != "" && @request.auth.role = "Admin"',
+        createRule: '@request.auth.id != "" && @request.auth.role = "Admin"',
+        updateRule: "",
+        deleteRule: '@request.auth.id != "" && @request.auth.role = "Admin"',
+      },
+    },
   ];
 
   for (const { name, rules } of collectionRules) {
@@ -286,7 +297,6 @@ async function patchMultiSelectFields() {
   // Map of collection name → field names that must be unlimited multi-select.
   const targets: Record<string, string[]> = {
     epics: ["watchers"],
-    tasks: ["watchers"],
     comments: ["mentions"],
     goals: ["linked_epics"],
   };
@@ -302,11 +312,17 @@ async function patchMultiSelectFields() {
       let patched = false;
       const updatedFields = rawFields.map((f) => {
         if (!fieldNames.includes(f.name as string)) return f;
-        // Remove maxSelect so PB treats this as unlimited (null pointer in Go).
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        const { maxSelect: _drop, ...rest } = f;
+        // Explicitly set maxSelect to a very large number so PocketBase treats
+        // this field as unlimited multi-select.
+        //
+        // Why not omit maxSelect? pb.collections.update() sends a PATCH request;
+        // PocketBase keeps the existing value for any field NOT present in the
+        // payload — so omitting maxSelect would leave it at 0, which PB v0.36
+        // treats as single-select (returns a bare string instead of an array).
+        //
+        // Why not null? JSON null fails PB's number field validator since v0.26.
         patched = true;
-        return rest;
+        return { ...f, maxSelect: 2147483647 };
       });
 
       if (!patched) {
@@ -399,12 +415,16 @@ async function createCollections() {
           maxSelect: 1,
           cascadeDelete: false,
         },
-        // unlimited relations: omit maxSelect entirely
+        // unlimited multi-select relation: explicitly set a very large maxSelect
+        // so PocketBase stores it as multi-select from creation.
+        // Omitting maxSelect causes PB to default to Go's zero value (0),
+        // which PB v0.36 treats as single-select.
         {
           name: "watchers",
           type: "relation",
           collectionId: colId("users"),
           cascadeDelete: false,
+          maxSelect: 2147483647,
         },
       ],
     }),
@@ -437,6 +457,7 @@ async function createCollections() {
         },
         { name: "due_date", type: "date" },
         { name: "estimate", type: "number" },
+        { name: "order", type: "number" },
         {
           name: "epic",
           type: "relation",
@@ -457,12 +478,6 @@ async function createCollections() {
           type: "relation",
           collectionId: colId("users"),
           maxSelect: 1,
-          cascadeDelete: false,
-        },
-        {
-          name: "watchers",
-          type: "relation",
-          collectionId: colId("users"),
           cascadeDelete: false,
         },
       ],
@@ -596,7 +611,51 @@ async function createCollections() {
       ],
     }),
 
-    // 8. goal_kpis — depends on goals
+    // 8. invites — depends on users
+    () => ({
+      name: "invites",
+      type: "base",
+      listRule: open,
+      viewRule: open,
+      createRule: open,
+      updateRule: open,
+      deleteRule: open,
+      fields: [
+        { name: "email", type: "text", required: true },
+        {
+          name: "role",
+          type: "select",
+          required: true,
+          maxSelect: 1,
+          values: ["Admin", "Manager", "Member", "Viewer"],
+        },
+        {
+          name: "invited_by",
+          type: "relation",
+          required: true,
+          collectionId: colId("users"),
+          maxSelect: 1,
+          cascadeDelete: false,
+        },
+        {
+          name: "user",
+          type: "relation",
+          collectionId: colId("users"),
+          maxSelect: 1,
+          cascadeDelete: true,
+        },
+        {
+          name: "status",
+          type: "select",
+          required: true,
+          maxSelect: 1,
+          values: ["pending", "accepted", "expired"],
+        },
+        { name: "expires_at", type: "date", required: true },
+      ],
+    }),
+
+    // 9. goal_kpis — depends on goals
     () => ({
       name: "goal_kpis",
       type: "base",
@@ -814,7 +873,6 @@ async function seedTasksAndChildren(
           epic: pbEpicId,
           owner: task.owner ? userMap.get(task.owner.id) : null,
           assignee: task.assignee ? userMap.get(task.assignee.id) : null,
-          watchers: task.watchers.map((w) => userMap.get(w.id)).filter(Boolean),
         });
         pbTaskId = record.id;
         taskMap.set(task.id, pbTaskId);

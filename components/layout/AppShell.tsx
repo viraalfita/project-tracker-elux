@@ -11,18 +11,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
 
+  const isPublicPath = pathname === "/login";
+  // Profile setup is a standalone page — authenticated but no sidebar
+  const isStandalonePath = pathname === "/profile/setup";
+
   useEffect(() => {
-    if (isLoading) return; // wait for auth check before redirecting
-    if (!currentUser && pathname !== "/login") {
+    if (isLoading) return;
+    if (!currentUser && !isPublicPath) {
       router.replace("/login");
     }
-    if (currentUser && pathname === "/login") {
+    if (currentUser && isPublicPath) {
       router.replace("/dashboard");
     }
-  }, [currentUser, isLoading, pathname, router]);
+  }, [currentUser, isLoading, isPublicPath, pathname, router]);
 
-  // Login page — render with no sidebar
-  if (pathname === "/login") {
+  // Public pages and standalone onboarding — render without sidebar
+  if (isPublicPath || isStandalonePath) {
     return <>{children}</>;
   }
 

@@ -1,9 +1,13 @@
 "use client";
 
+// NOTE: OTP login is temporarily disabled. Password login is active.
+// To re-enable OTP: swap the form below for the OTP two-step flow
+// using requestOTP / verifyOTP from useAuth().
+
 import { useAuth } from "@/contexts/AuthContext";
 import { AlertCircle, FolderKanban, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { FormEvent, useState } from "react";
+import { useState } from "react";
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -13,11 +17,10 @@ export default function LoginPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  async function handleSubmit(e: FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent) {
     e.preventDefault();
     setError("");
     setIsLoading(true);
-
     try {
       await login(email, password);
       router.push("/dashboard");
@@ -44,10 +47,9 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {/* Login Form */}
+        {/* Login form */}
         <div className="bg-white rounded-2xl shadow-xl border border-border p-8">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {/* Email Input */}
             <div>
               <label
                 htmlFor="email"
@@ -65,13 +67,12 @@ export default function LoginPage() {
                 }}
                 placeholder="Enter your email"
                 disabled={isLoading}
-                className="w-full px-4 py-3 rounded-lg border border-border bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 autoFocus
                 required
+                className="w-full px-4 py-3 rounded-lg border border-border bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 transition-all"
               />
             </div>
 
-            {/* Password Input */}
             <div>
               <label
                 htmlFor="password"
@@ -89,20 +90,18 @@ export default function LoginPage() {
                 }}
                 placeholder="Enter your password"
                 disabled={isLoading}
-                className="w-full px-4 py-3 rounded-lg border border-border bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 disabled:cursor-not-allowed transition-all"
                 required
+                className="w-full px-4 py-3 rounded-lg border border-border bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 transition-all"
               />
             </div>
 
-            {/* Error Message */}
             {error && (
               <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
-                <AlertCircle className="h-5 w-5 text-red-600 flex-shrink-0" />
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
                 <p className="text-sm text-red-700">{error}</p>
               </div>
             )}
 
-            {/* Submit Button */}
             <button
               type="submit"
               disabled={isLoading || !email || !password}
@@ -110,17 +109,17 @@ export default function LoginPage() {
             >
               {isLoading ? (
                 <>
-                  <Loader2 className="h-5 w-5 animate-spin" />
+                  <Loader2 className="h-4 w-4 animate-spin" />
                   Signing in...
                 </>
               ) : (
-                "Sign In"
+                "Sign in"
               )}
             </button>
           </form>
         </div>
 
-        {/* Dev Credentials (seeded via npm run pb:setup) */}
+        {/* Dev credentials */}
         <div className="mt-6 p-4 bg-white/50 rounded-lg border border-border/50">
           <p className="text-xs font-semibold text-foreground mb-2">
             Dev Credentials — password:{" "}
@@ -131,11 +130,11 @@ export default function LoginPage() {
           <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
             {[
               { e: "arya.pradana@elux.space", role: "Admin" },
-              { e: "lintang@inboxkitten.com", role: "Manager" },
-              { e: "dewi@inboxkitten.com", role: "Manager" },
-              { e: "ahrasya@inboxkitten.com", role: "Manager" },
-              { e: "vira@inboxkitten.com", role: "Member" },
-              { e: "aurel@inboxkitten.com", role: "Member" },
+              { e: "lintang@elux.space", role: "Manager" },
+              { e: "dewi@elux.space", role: "Manager" },
+              { e: "ahrasya@elux.space", role: "Manager" },
+              { e: "vira@elux.space", role: "Member" },
+              { e: "aurelia@elux.space", role: "Member" },
             ].map(({ e, role }) => (
               <button
                 key={e}

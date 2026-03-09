@@ -14,7 +14,9 @@ export function TaskRow({ task }: TaskRowProps) {
   const { epics } = useDataStore();
   const epic = epics.find((e) => e.id === task.epicId);
   const isOverdue =
-    new Date(task.dueDate) < new Date("2026-02-10") && task.status !== "Done";
+    !!task.dueDate &&
+    new Date(task.dueDate) < new Date() &&
+    task.status !== "Done";
 
   return (
     <Link href={`/task/${task.id}`}>

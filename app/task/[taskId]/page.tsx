@@ -5,7 +5,6 @@ import { AvatarChip, UnassignedChip } from "@/components/shared/AvatarChip";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { UserSelect } from "@/components/shared/UserSelect";
-import { WatchersSection } from "@/components/shared/WatchersSection";
 import { CommentsSection } from "@/components/task/CommentsSection";
 import { SubtaskList } from "@/components/task/SubtaskList";
 import { useAuth } from "@/contexts/AuthContext";
@@ -19,7 +18,7 @@ import {
 import { TaskStatus, User } from "@/lib/types";
 import { CalendarDays } from "lucide-react";
 import { notFound } from "next/navigation";
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 
 const STATUSES: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 
@@ -29,7 +28,7 @@ interface TaskPageProps {
 
 export default function TaskPage({ params }: TaskPageProps) {
   const { taskId } = use(params);
-  const { tasks, epics, users, updateTask, updateTaskWatchers } =
+  const { tasks, epics, users, updateTask } =
     useDataStore();
   const { currentUser } = useAuth();
 
@@ -51,20 +50,6 @@ export default function TaskPage({ params }: TaskPageProps) {
   const assignableUserIds = getAssignableUsers(currentUser, epic, users);
   const assignableUsers = users.filter((u) => assignableUserIds.includes(u.id));
 
-  // Check for overdue and notify watchers (MVP: on page load)
-  useEffect(() => {
-    if (task.dueDate && task.status !== "Done" && task.watchers.length > 0) {
-      const NOW = new Date("2026-02-10");
-      const dueDate = new Date(task.dueDate);
-      if (NOW > dueDate) {
-        console.log(
-          `[Overdue Alert] Task "${task.title}" is overdue (due: ${task.dueDate}). Notifying:`,
-          task.watchers.map((w) => w.name),
-        );
-      }
-    }
-  }, [task]);
-
   function handleStatusChange(newStatus: TaskStatus) {
     setStatus(newStatus);
     if (task) updateTask(task.id, { status: newStatus });
@@ -81,7 +66,7 @@ export default function TaskPage({ params }: TaskPageProps) {
       <div className="border-b border-border bg-white px-6 py-4">
         <Breadcrumbs
           items={[
-            { label: "Dashboard", href: "/dashboard" },
+            { label: "Epics", href: "/epics" },
             ...(epic ? [{ label: epic.title, href: `/epic/${epic.id}` }] : []),
             { label: task.title },
           ]}
@@ -184,16 +169,6 @@ export default function TaskPage({ params }: TaskPageProps) {
                 </div>
               )}
 
-              {/* Watchers */}
-              {epic && (
-                <div className="flex flex-col gap-1 min-w-[220px]">
-                  <WatchersSection
-                    watchers={task.watchers}
-                    epic={epic}
-                    onUpdate={updateTaskWatchers.bind(null, task.id)}
-                  />
-                </div>
-              )}
             </div>
           </div>
 

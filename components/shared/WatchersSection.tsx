@@ -6,7 +6,7 @@ import { useDataStore } from "@/contexts/DataStore";
 import { canManageWatchers } from "@/lib/permissions";
 import { Epic, User } from "@/lib/types";
 import { Eye } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface WatchersSectionProps {
   watchers: User[];
@@ -29,6 +29,16 @@ export function WatchersSection({
   // Any workspace user can be added as a watcher (the owner controls the list).
   // Edit button is only shown to the epic owner and Admin.
   const canEdit = canManageWatchers(currentUser, epic);
+
+  // Keep selectedUserIds in sync with the watchers prop so that:
+  // - Re-opening Edit after a confirmed save shows the correct pre-selection.
+  // - An external update (e.g. server confirmation) is reflected immediately.
+  // We only sync when the edit panel is closed to avoid discarding in-progress changes.
+  useEffect(() => {
+    if (!isEditing) {
+      setSelectedUserIds(watchers.map((w) => w.id));
+    }
+  }, [watchers, isEditing]);
 
   function handleToggleUser(userId: string) {
     setSelectedUserIds((prev) =>

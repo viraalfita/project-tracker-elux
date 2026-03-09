@@ -1,6 +1,7 @@
 "use client";
 
 import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { Task, TaskStatus } from "@/lib/types";
 import { TaskCard } from "@/components/board/TaskCard";
 
@@ -30,6 +31,8 @@ export function KanbanColumn({ status, tasks, canDragDrop }: KanbanColumnProps) 
     disabled: !canDragDrop,
   });
 
+  const taskIds = tasks.map((t) => t.id);
+
   return (
     <div
       ref={setNodeRef}
@@ -48,16 +51,18 @@ export function KanbanColumn({ status, tasks, canDragDrop }: KanbanColumnProps) 
       </div>
 
       {/* Cards */}
-      <div className="flex flex-col gap-2 p-2 flex-1">
-        {tasks.length === 0 && (
-          <div className="flex items-center justify-center flex-1 py-8">
-            <p className="text-xs text-muted-foreground">No tasks</p>
-          </div>
-        )}
-        {tasks.map((task) => (
-          <TaskCard key={task.id} task={task} canDragDrop={canDragDrop} />
-        ))}
-      </div>
+      <SortableContext items={taskIds} strategy={verticalListSortingStrategy}>
+        <div className="flex flex-col gap-2 p-2 flex-1">
+          {tasks.length === 0 && (
+            <div className="flex items-center justify-center flex-1 py-8">
+              <p className="text-xs text-muted-foreground">No tasks</p>
+            </div>
+          )}
+          {tasks.map((task) => (
+            <TaskCard key={task.id} task={task} canDragDrop={canDragDrop} />
+          ))}
+        </div>
+      </SortableContext>
     </div>
   );
 }

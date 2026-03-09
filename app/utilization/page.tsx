@@ -62,12 +62,7 @@ export default function UtilizationPage() {
   return (
     <div className="flex flex-col h-full">
       <div className="border-b border-border bg-white px-6 py-4">
-        <Breadcrumbs
-          items={[
-            { label: "Dashboard", href: "/dashboard" },
-            { label: "Team Workload" },
-          ]}
-        />
+        <Breadcrumbs items={[{ label: "Team Workload" }]} />
       </div>
 
       <div className="px-6 py-6 overflow-auto">
