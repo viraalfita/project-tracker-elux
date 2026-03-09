@@ -114,7 +114,7 @@ interface DataStoreContextType {
   updateTask: (
     id: string,
     data: Partial<
-      Pick<Task, "title" | "description" | "status" | "priority" | "order">
+      Pick<Task, "title" | "description" | "status" | "priority" | "order" | "dueDate">
     > & { assigneeId?: string },
   ) => void;
   deleteTask: (id: string) => void;
@@ -626,7 +626,7 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     (
       id: string,
       data: Partial<
-        Pick<Task, "title" | "description" | "status" | "priority" | "order">
+        Pick<Task, "title" | "description" | "status" | "priority" | "order" | "dueDate">
       > & { assigneeId?: string },
     ) => {
       // Compute a validated assigneeId by reading current tasks from functional state.
@@ -670,6 +670,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       if (data.status !== undefined) payload.status = data.status;
       if (data.priority !== undefined) payload.priority = data.priority;
       if (data.order !== undefined) payload.order = data.order;
+      if (data.dueDate !== undefined)
+        payload.due_date = data.dueDate ? `${data.dueDate} 00:00:00.000Z` : null;
       // Only persist a valid assigneeId (resolvedAssigneeId is set to undefined if invalid)
       if (resolvedAssigneeId !== undefined) {
         payload.assignee = resolvedAssigneeId || null;
