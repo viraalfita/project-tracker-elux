@@ -42,6 +42,7 @@ export function TaskFormDialog({
     task?.priority ?? "Medium",
   );
   const [assignee, setAssignee] = useState<User | null>(task?.assignee ?? null);
+  const [dueDate, setDueDate] = useState(task?.dueDate ?? "");
 
   // Get assignable users based on permissions
   const canAssign = canAssignTask(currentUser, epic);
@@ -55,6 +56,7 @@ export function TaskFormDialog({
       setStatus(task?.status ?? "To Do");
       setPriority(task?.priority ?? "Medium");
       setAssignee(task?.assignee ?? null);
+      setDueDate(task?.dueDate ?? "");
       setErrors({});
     }
   }, [open, task]);
@@ -73,6 +75,7 @@ export function TaskFormDialog({
         status,
         priority,
         assigneeId: assignee?.id,
+        dueDate: dueDate || undefined,
       });
       toast(`Task "${title.trim()}" updated.`);
     } else {
@@ -201,6 +204,18 @@ export function TaskFormDialog({
                   ))}
                 </select>
               </div>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-foreground block mb-1">
+                Due Date
+              </label>
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full rounded-md border border-border px-3 py-2 text-sm text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
             </div>
 
             <div className="flex gap-2 justify-end pt-2">
