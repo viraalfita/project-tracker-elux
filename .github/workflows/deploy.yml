@@ -4,21 +4,61 @@ on:
   push:
     branches:
       - main
+      - dev
 
 jobs:
-  deploy:
+  deploy-production:
+    name: Deploy Production
+    if: github.ref == 'refs/heads/main'
     runs-on: self-hosted
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Sync project to server
+      - name: Sync production app to VPS
         run: |
-          rsync -av --delete ./ /opt/stack/app/
+          rsync -av --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "node_modules" \
+            --exclude ".next" \
+            ./ /opt/stack/app/
 
-      - name: Restart containers
+      - name: Deploy production stack
         run: |
           cd /opt/stack
-          docker compose up -d --build
-          docker image prune -f
+          docker compose up -d --build app
+
+      - name: Restart production app
+        run: |
+          cd /opt/stack
+          docker compose restart app
+
+  deploy-development:
+    name: Deploy Development
+    if: github.ref == 'refs/heads/dev'
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Sync development app to VPS
+        run: |
+          rsync -av --delete \
+            --exclude ".git" \
+            --exclude ".github" \
+            --exclude "node_modules" \
+            --exclude ".next" \
+            ./ /opt/stack/dev/app/
+
+      - name: Deploy development stack
+        run: |
+          cd /opt/stack/dev
+          docker compose up -d --build app
+
+      - name: Restart development app
+        run: |
+          cd /opt/stack/dev
+          docker compose restart app
