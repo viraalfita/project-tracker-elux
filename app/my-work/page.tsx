@@ -252,7 +252,9 @@ export default function MyWorkPage() {
               Nothing assigned to you yet.
             </p>
           </div>
-        ) : myTasks.length > 0 && myTasks.every((t) => t.status === "Done") && activeFilterCount === 0 ? (
+        ) : myTasks.length > 0 &&
+          myTasks.every((t) => t.status === "Done") &&
+          activeFilterCount === 0 ? (
           <div className="rounded-lg border border-dashed border-green-200 bg-green-50/50 py-16 text-center">
             <p className="text-green-700 font-medium text-sm">
               No tasks in progress. You&apos;re all caught up! 🎉
