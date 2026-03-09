@@ -76,7 +76,7 @@ export function Sidebar() {
           <FolderKanban className="h-5 w-5 text-indigo-600 shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">
-              Elux Workspace (Dev)
+              Elux Workspace (Development)
             </p>
             <p className="text-xs text-muted-foreground truncate">
               {currentUser.role}
