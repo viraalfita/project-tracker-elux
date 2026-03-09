@@ -1,7 +1,7 @@
 "use client";
 
-import { CommandPalette } from "@/components/search/CommandPalette";
 import { NotificationPanel } from "@/components/layout/NotificationPanel";
+import { CommandPalette } from "@/components/search/CommandPalette";
 import { useAuth } from "@/contexts/AuthContext";
 import { Role } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -18,8 +18,8 @@ import {
   Users,
 } from "lucide-react";
 import Link from "next/link";
-import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 
 interface NavItem {
   href: string;
@@ -76,7 +76,7 @@ export function Sidebar() {
           <FolderKanban className="h-5 w-5 text-indigo-600 shrink-0" />
           <div className="min-w-0">
             <p className="text-sm font-semibold text-foreground truncate">
-              Elux Workspace
+              Elux Workspace (Dev)
             </p>
             <p className="text-xs text-muted-foreground truncate">
               {currentUser.role}
@@ -92,7 +92,9 @@ export function Sidebar() {
           >
             <Search className="h-3.5 w-3.5 shrink-0" />
             <span className="flex-1 text-left">Search...</span>
-            <kbd className="rounded border border-border px-1 text-[10px]">⌘K</kbd>
+            <kbd className="rounded border border-border px-1 text-[10px]">
+              ⌘K
+            </kbd>
           </button>
         </div>
 
