@@ -18,22 +18,19 @@ jobs:
 
       - name: Sync production app to VPS
         run: |
-          rsync -av --delete \
+          rsync -rlvz --delete --omit-dir-times --no-perms \
             --exclude ".git" \
             --exclude ".github" \
             --exclude "node_modules" \
             --exclude ".next" \
+            --exclude ".DS_Store" \
+            --exclude ".agents" \
             ./ /opt/stack/app/
 
       - name: Deploy production stack
         run: |
           cd /opt/stack
           docker compose up -d --build app
-
-      - name: Restart production app
-        run: |
-          cd /opt/stack
-          docker compose restart app
 
   deploy-development:
     name: Deploy Development
@@ -46,19 +43,16 @@ jobs:
 
       - name: Sync development app to VPS
         run: |
-          rsync -av --delete \
+          rsync -rlvz --delete --omit-dir-times --no-perms \
             --exclude ".git" \
             --exclude ".github" \
             --exclude "node_modules" \
             --exclude ".next" \
+            --exclude ".DS_Store" \
+            --exclude ".agents" \
             ./ /opt/stack/dev/app/
 
       - name: Deploy development stack
         run: |
           cd /opt/stack/dev
           docker compose up -d --build app
-
-      - name: Restart development app
-        run: |
-          cd /opt/stack/dev
-          docker compose restart app
