@@ -26,10 +26,7 @@ function epicIsAtRisk(epic: Epic): boolean {
   return new Date(epic.endDate) < NOW;
 }
 
-function deriveGoalStatus(
-  goal: Goal,
-  epics: Epic[],
-): GoalStatus {
+function deriveGoalStatus(goal: Goal, epics: Epic[]): GoalStatus {
   const linked = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
   if (linked.length === 0) return "On Track";
   if (linked.every((e) => e.status === "Done")) return "Completed";
