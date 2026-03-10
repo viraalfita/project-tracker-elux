@@ -63,21 +63,22 @@ export async function GET(request: NextRequest) {
 
   try {
     const pb = await getSuperuserClient();
-    // Try with relation expansion; fall back to plain list if the relation
-    // field isn't configured in this PocketBase instance.
-    let invites;
-    try {
-      invites = await pb.collection("invites").getFullList({
-        sort: "-created",
-        expand: "invited_by",
-      });
-    } catch {
-      invites = await pb.collection("invites").getFullList({ sort: "-created" });
-    }
+
+    // Try with relation expansion first; strip it if PocketBase rejects the field.
+    // If the invites collection doesn't exist yet, return an empty array so the
+    // workspace page degrades gracefully instead of showing an error.
+    const invites = await pb
+      .collection("invites")
+      .getFullList({ sort: "-created", expand: "invited_by" })
+      .catch(() =>
+        pb.collection("invites").getFullList({ sort: "-created" })
+      )
+      .catch(() => []);
+
     return NextResponse.json(invites);
-  } catch (err: unknown) {
-    const msg = err instanceof Error ? err.message : "Failed to fetch invites";
-    return NextResponse.json({ error: msg }, { status: 400 });
+  } catch {
+    // Superuser auth failed or unexpected error — return empty list
+    return NextResponse.json([]);
   }
 }
 
