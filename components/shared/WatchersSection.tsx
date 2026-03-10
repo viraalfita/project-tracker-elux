@@ -5,8 +5,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { canManageWatchers } from "@/lib/permissions";
 import { Epic, User } from "@/lib/types";
-import { Eye } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Plus, Users, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 
 interface WatchersSectionProps {
   watchers: User[];
@@ -21,109 +21,108 @@ export function WatchersSection({
 }: WatchersSectionProps) {
   const { currentUser } = useAuth();
   const { users } = useDataStore();
-  const [isEditing, setIsEditing] = useState(false);
-  const [selectedUserIds, setSelectedUserIds] = useState<string[]>(
-    watchers.map((w) => w.id),
-  );
+  const [showPicker, setShowPicker] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
 
-  // Any workspace user can be added as a watcher (the owner controls the list).
-  // Edit button is only shown to the epic owner and Admin.
   const canEdit = canManageWatchers(currentUser, epic);
 
-  // Keep selectedUserIds in sync with the watchers prop so that:
-  // - Re-opening Edit after a confirmed save shows the correct pre-selection.
-  // - An external update (e.g. server confirmation) is reflected immediately.
-  // We only sync when the edit panel is closed to avoid discarding in-progress changes.
+  // Close picker when clicking outside
   useEffect(() => {
-    if (!isEditing) {
-      setSelectedUserIds(watchers.map((w) => w.id));
+    function handleClickOutside(e: MouseEvent) {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowPicker(false);
+      }
     }
-  }, [watchers, isEditing]);
+    if (showPicker) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [showPicker]);
 
-  function handleToggleUser(userId: string) {
-    setSelectedUserIds((prev) =>
-      prev.includes(userId)
-        ? prev.filter((id) => id !== userId)
-        : [...prev, userId],
-    );
+  function handleRemove(userId: string) {
+    onUpdate(watchers.filter((w) => w.id !== userId).map((w) => w.id));
   }
 
-  function handleSave() {
-    onUpdate(selectedUserIds);
-    setIsEditing(false);
+  function handleAdd(userId: string) {
+    if (!watchers.some((w) => w.id === userId)) {
+      onUpdate([...watchers.map((w) => w.id), userId]);
+    }
+    setShowPicker(false);
   }
 
-  function handleCancel() {
-    setSelectedUserIds(watchers.map((w) => w.id));
-    setIsEditing(false);
-  }
+  const addableUsers = users.filter(
+    (u) => !watchers.some((w) => w.id === u.id),
+  );
 
   return (
     <div className="flex flex-col gap-2">
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-1.5">
-          <Eye className="h-4 w-4 text-muted-foreground" />
-          <span className="text-xs uppercase tracking-wide font-medium text-muted-foreground">
-            Watchers
+          <Users className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-semibold text-foreground">Members</span>
+          <span className="text-sm text-muted-foreground">
+            ({watchers.length})
           </span>
         </div>
-        {canEdit && !isEditing && (
-          <button
-            onClick={() => setIsEditing(true)}
-            className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
-          >
-            Edit
-          </button>
+        {canEdit && (
+          <div className="relative" ref={pickerRef}>
+            <button
+              onClick={() => setShowPicker((v) => !v)}
+              className="inline-flex items-center gap-1 rounded-md border border-border bg-white px-2.5 py-1 text-sm font-semibold text-foreground hover:bg-slate-50 transition-colors"
+            >
+              <Plus className="h-3.5 w-3.5" />
+              Add
+            </button>
+            {showPicker && (
+              <div className="absolute right-0 top-full mt-1 z-50 w-52 rounded-lg border border-border bg-white shadow-lg py-1">
+                {addableUsers.length === 0 ? (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">
+                    All users are already members
+                  </p>
+                ) : (
+                  addableUsers.map((user) => (
+                    <button
+                      key={user.id}
+                      onClick={() => handleAdd(user.id)}
+                      className="flex w-full items-center gap-2 px-3 py-2 text-sm hover:bg-slate-50 transition-colors"
+                    >
+                      <AvatarChip user={user} size="sm" showName />
+                    </button>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
         )}
       </div>
 
-      {isEditing ? (
-        <div className="rounded-lg border border-border bg-slate-50 p-3 space-y-3">
-          <div className="text-xs text-muted-foreground mb-2">
-            Select users to watch this item:
-          </div>
-          <div className="space-y-1.5 max-h-48 overflow-y-auto">
-            {users.map((user) => (
-              <label
-                key={user.id}
-                className="flex items-center gap-2 p-2 rounded hover:bg-white cursor-pointer transition-colors"
+      {/* Member list */}
+      <div className="rounded-lg border border-border bg-white overflow-hidden">
+        {watchers.length === 0 ? (
+          <p className="px-4 py-3 text-sm text-muted-foreground">No members</p>
+        ) : (
+          <div className="divide-y divide-border">
+            {watchers.map((watcher) => (
+              <div
+                key={watcher.id}
+                className="flex items-center justify-between px-4 py-2.5"
               >
-                <input
-                  type="checkbox"
-                  checked={selectedUserIds.includes(user.id)}
-                  onChange={() => handleToggleUser(user.id)}
-                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
-                />
-                <AvatarChip user={user} size="sm" showName />
-              </label>
+                <AvatarChip user={watcher} size="sm" showName />
+                {canEdit && (
+                  <button
+                    onClick={() => handleRemove(watcher.id)}
+                    className="text-red-400 hover:text-red-600 transition-colors ml-2"
+                    aria-label={`Remove ${watcher.name}`}
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             ))}
           </div>
-          <div className="flex gap-2 pt-2 border-t border-border">
-            <button
-              onClick={handleSave}
-              className="flex-1 px-3 py-1.5 rounded bg-indigo-600 text-white text-xs font-medium hover:bg-indigo-700 transition-colors"
-            >
-              Save
-            </button>
-            <button
-              onClick={handleCancel}
-              className="flex-1 px-3 py-1.5 rounded border border-border bg-white text-foreground text-xs font-medium hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          {watchers.length > 0 ? (
-            watchers.map((watcher) => (
-              <AvatarChip key={watcher.id} user={watcher} size="sm" showName />
-            ))
-          ) : (
-            <span className="text-xs text-muted-foreground">No watchers</span>
-          )}
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

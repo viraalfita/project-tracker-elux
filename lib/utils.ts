@@ -20,6 +20,24 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/** Returns today's date as "YYYY-MM-DD" in the local timezone. */
+export function getTodayStr(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+/** Returns true if a task is overdue: dueDate is before today and task is not Done. */
+export function isTaskOverdue(
+  dueDate: string | undefined,
+  status: string,
+): boolean {
+  if (!dueDate) return false;
+  return dueDate < getTodayStr() && status !== "Done";
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // TEAM WORKLOAD (IDLE RESOURCE) UTILITIES
 // Workload is measured by count of "In Progress" tasks per user
@@ -145,26 +163,22 @@ export function buildKpiCsvRows(
   tasks: Task[],
   epics: { id: string; title: string }[],
 ): KpiCsvRow[] {
-  const NOW = new Date("2026-02-10");
-
   return tasks.map((task) => {
     const epic = epics.find((e) => e.id === task.epicId);
     const epicName = epic?.title || "Unknown Epic";
     const assigneeName = task.assignee?.name || "Unassigned";
 
     // Calculate overdue
-    const overdue = (() => {
-      if (!task.dueDate) return "";
-      const dueDate = new Date(task.dueDate);
-      if (task.status === "Done") {
-        return "No";
-      }
-      return NOW > dueDate ? "Yes" : "No";
-    })();
+    const overdue = !task.dueDate
+      ? ""
+      : task.status === "Done"
+        ? "No"
+        : isTaskOverdue(task.dueDate, task.status)
+          ? "Yes"
+          : "No";
 
-    // At Risk: status-based only (High priority tasks in progress)
-    const atRisk =
-      task.status === "In Progress" && task.priority === "High" ? "Yes" : "No";
+    // At Risk: task is overdue (past due date and not Done)
+    const atRisk = isTaskOverdue(task.dueDate, task.status) ? "Yes" : "No";
 
     return {
       taskId: task.id,

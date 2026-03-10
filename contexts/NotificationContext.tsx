@@ -2,6 +2,7 @@
 
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
+import { isTaskOverdue } from "@/lib/utils";
 import {
   createContext,
   ReactNode,
@@ -32,7 +33,10 @@ const NotificationContext = createContext<NotificationContextType | null>(null);
 
 export function useNotifications() {
   const ctx = useContext(NotificationContext);
-  if (!ctx) throw new Error("useNotifications must be used inside NotificationProvider");
+  if (!ctx)
+    throw new Error(
+      "useNotifications must be used inside NotificationProvider",
+    );
   return ctx;
 }
 
@@ -56,15 +60,14 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const checkNotifications = useCallback(() => {
     if (!currentUser) return;
     const now = new Date();
+    now.setHours(0, 0, 0, 0);
     const prevTasks = prevTasksRef.current;
 
     tasks.forEach((task) => {
       // Overdue notification
       if (
         task.assignee?.id === currentUser.id &&
-        task.dueDate &&
-        new Date(task.dueDate) < now &&
-        task.status !== "Done"
+        isTaskOverdue(task.dueDate, task.status)
       ) {
         upsertNotification({
           id: `overdue-${task.id}`,

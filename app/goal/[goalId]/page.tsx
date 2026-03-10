@@ -29,28 +29,27 @@ interface GoalPageProps {
 }
 
 const NOW = new Date();
+NOW.setHours(0, 0, 0, 0);
 
-function epicIsAtRisk(epic: Epic, tasks: Task[]): boolean {
-  const epicTasks = tasks.filter((t) => t.epicId === epic.id);
-  const overdueCount = epicTasks.filter(
-    (t) => new Date(t.dueDate) < NOW && t.status !== "Done"
-  ).length;
-  const atRiskCount = epicTasks.filter(
-    (t) => t.status === "In Progress" && t.priority === "High"
-  ).length;
-  return overdueCount > 0 || atRiskCount > 0;
+function epicIsAtRisk(epic: Epic): boolean {
+  if (!epic.endDate || epic.status === "Done") return false;
+  return new Date(epic.endDate) < NOW;
 }
 
-function deriveGoalStatus(goal: Goal, epics: Epic[], tasks: Task[]): GoalStatus {
+function deriveGoalStatus(
+  goal: Goal,
+  epics: Epic[],
+  tasks: Task[],
+): GoalStatus {
   const linked = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
   if (linked.length === 0) return "On Track";
   if (linked.every((e) => e.status === "Done")) return "Completed";
-  const anyAtRisk = linked.some((epic) => epicIsAtRisk(epic, tasks));
+  const anyAtRisk = linked.some((epic) => epicIsAtRisk(epic));
   return anyAtRisk ? "At Risk" : "On Track";
 }
 
-function getEpicHealth(epic: Epic, tasks: Task[]): "At Risk" | "On Track" {
-  return epicIsAtRisk(epic, tasks) ? "At Risk" : "On Track";
+function getEpicHealth(epic: Epic): "At Risk" | "On Track" {
+  return epicIsAtRisk(epic) ? "At Risk" : "On Track";
 }
 
 const GOAL_STATUS_STYLES: Record<GoalStatus, string> = {
@@ -334,7 +333,7 @@ export default function GoalPage({ params }: GoalPageProps) {
             ) : (
               <div className="divide-y divide-border">
                 {linkedEpics.map((epic) => {
-                  const health = getEpicHealth(epic, tasks);
+                  const health = getEpicHealth(epic);
                   return (
                     <div
                       key={epic.id}

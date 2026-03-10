@@ -3,7 +3,12 @@
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { calculateTeamWorkload, downloadKpiCsv, getTaskProgress } from "@/lib/utils";
+import {
+  calculateTeamWorkload,
+  downloadKpiCsv,
+  getTaskProgress,
+  isTaskOverdue,
+} from "@/lib/utils";
 import {
   AlertCircle,
   AlertTriangle,
@@ -27,6 +32,7 @@ export default function DashboardPage() {
   const [kpiEpicFilter, setKpiEpicFilter] = useState("");
 
   const NOW = new Date();
+  NOW.setHours(0, 0, 0, 0);
   const isManager = currentUser?.role === "Manager";
   const isManagementView =
     currentUser?.role === "Admin" || currentUser?.role === "Manager";
@@ -34,9 +40,7 @@ export default function DashboardPage() {
   // For Managers, scope to only epics they own
   const scopedEpics = useMemo(
     () =>
-      isManager
-        ? epics.filter((e) => e.owner.id === currentUser?.id)
-        : epics,
+      isManager ? epics.filter((e) => e.owner.id === currentUser?.id) : epics,
     [epics, isManager, currentUser],
   );
 
@@ -69,10 +73,9 @@ export default function DashboardPage() {
   const doneTasks = kpiTasks.filter((t) => t.status === "Done").length;
 
   // Health indicators
-  const overdueCount = kpiTasks.filter((t) => {
-    const due = new Date(t.dueDate);
-    return due < NOW && t.status !== "Done";
-  }).length;
+  const overdueCount = kpiTasks.filter((t) =>
+    isTaskOverdue(t.dueDate, t.status),
+  ).length;
 
   const atRiskCount = kpiTasks.filter((t) => {
     return t.status === "In Progress" && t.priority === "High";
@@ -101,10 +104,9 @@ export default function DashboardPage() {
             epicTasks.reduce((sum, t) => sum + getTaskProgress(t), 0) /
               epicTasks.length,
           );
-    const overdue = epicTasks.filter((t) => {
-      const due = new Date(t.dueDate);
-      return due < NOW && t.status !== "Done";
-    }).length;
+    const overdue = epicTasks.filter((t) =>
+      isTaskOverdue(t.dueDate, t.status),
+    ).length;
     return { epic, progress, overdue, taskCount: epicTasks.length };
   });
 

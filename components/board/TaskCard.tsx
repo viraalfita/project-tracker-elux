@@ -1,11 +1,12 @@
 "use client";
 
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { AvatarChip, UnassignedChip } from "@/components/shared/AvatarChip";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { useDataStore } from "@/contexts/DataStore";
 import { Task } from "@/lib/types";
+import { isTaskOverdue } from "@/lib/utils";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { AlertTriangle, CalendarDays, Clock } from "lucide-react";
 import Link from "next/link";
 
@@ -18,8 +19,9 @@ export function TaskCard({ task, canDragDrop }: TaskCardProps) {
   const { epics } = useDataStore();
   const epic = epics.find((e) => e.id === task.epicId);
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-  const isOverdue = dueDate !== null && dueDate < now && task.status !== "Done";
+  const isOverdue = isTaskOverdue(task.dueDate, task.status);
   const isDueSoon =
     !isOverdue &&
     dueDate !== null &&

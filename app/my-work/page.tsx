@@ -6,6 +6,7 @@ import { AvatarChip } from "@/components/shared/AvatarChip";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { TaskStatus } from "@/lib/types";
+import { isTaskOverdue } from "@/lib/utils";
 import { CheckSquare, Filter } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -27,7 +28,11 @@ export default function MyWorkPage() {
   const [dueDateFilter, setDueDateFilter] = useState<DueDateFilter>("all");
   const [showFilters, setShowFilters] = useState(false);
 
-  const NOW = useMemo(() => new Date(), []);
+  const NOW = useMemo(() => {
+    const d = new Date();
+    d.setHours(0, 0, 0, 0);
+    return d;
+  }, []);
   const WEEK_END = useMemo(
     () => new Date(NOW.getTime() + 7 * 24 * 60 * 60 * 1000),
     [NOW],
@@ -50,7 +55,7 @@ export default function MyWorkPage() {
 
         switch (dueDateFilter) {
           case "overdue":
-            return dueDate < NOW && t.status !== "Done";
+            return isTaskOverdue(t.dueDate, t.status);
           case "today":
             return dueDate.toDateString() === NOW.toDateString();
           case "thisWeek":
