@@ -12,7 +12,6 @@ const PB_URL =
   process.env.NEXT_PUBLIC_POCKETBASE_URL ?? "https://pb.eluxemang.top";
 const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL ?? "";
 const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD ?? "";
-const INVITED_PLACEHOLDER = "(Invited)";
 
 async function getSuperuserClient(): Promise<PocketBase> {
   const pb = new PocketBase(PB_URL);
@@ -23,13 +22,13 @@ async function getSuperuserClient(): Promise<PocketBase> {
   return pb;
 }
 
-async function verifyAdminToken(token: string): Promise<boolean> {
+async function verifyAdminOrManagerToken(token: string): Promise<boolean> {
   try {
     const pb = new PocketBase(PB_URL);
     pb.autoCancellation(false);
     pb.authStore.save(token, null);
     const result = await pb.collection("users").authRefresh<{ role?: string }>();
-    return result.record?.role === "Admin";
+    return result.record?.role === "Admin" || result.record?.role === "Manager";
   } catch {
     return false;
   }
@@ -44,8 +43,8 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const token = extractToken(request);
-  if (!token || !(await verifyAdminToken(token))) {
-    return NextResponse.json({ error: "Forbidden: Admin access required." }, { status: 403 });
+  if (!token || !(await verifyAdminOrManagerToken(token))) {
+    return NextResponse.json({ error: "Forbidden: Admin or Manager access required." }, { status: 403 });
   }
 
   const { id } = await params;
@@ -67,17 +66,13 @@ export async function DELETE(
     return NextResponse.json({ error: msg }, { status: 400 });
   }
 
-  // Delete the user record only if they've never logged in (placeholder name still set)
+  // Delete the linked user record — the invite is pending, meaning the user
+  // has not yet logged in, so it is safe to remove the pre-created record.
   const linkedUserId = invite.user as string | undefined;
   if (linkedUserId) {
-    try {
-      const user = await pb.collection("users").getOne(linkedUserId);
-      if (user.name === INVITED_PLACEHOLDER) {
-        await pb.collection("users").delete(linkedUserId);
-      }
-    } catch {
-      // Non-fatal — user may have already been deleted or modified
-    }
+    await pb.collection("users").delete(linkedUserId).catch(() => {
+      // Non-fatal — user may have already been deleted or logged in independently
+    });
   }
 
   return NextResponse.json({ success: true });

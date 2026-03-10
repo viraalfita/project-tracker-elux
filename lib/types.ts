@@ -88,6 +88,7 @@ export type InviteStatus = "pending" | "accepted" | "expired";
 
 export interface Invite {
   id: string;
+  name: string;
   email: string;
   role: Role;
   invitedBy: User;

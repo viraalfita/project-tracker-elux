@@ -38,9 +38,11 @@ export default function WorkspacePage() {
   const [invitesLoading, setInvitesLoading] = useState(false);
 
   const isAdmin = currentUser?.role === "Admin";
+  const isManager = currentUser?.role === "Manager";
+  const canInvite = isAdmin || isManager;
 
   const fetchInvites = useCallback(async () => {
-    if (!isAdmin) return;
+    if (!canInvite) return;
     setInvitesLoading(true);
     try {
       const res = await fetch("/api/admin/invites", {
@@ -51,6 +53,7 @@ export default function WorkspacePage() {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const mapped: Invite[] = data.map((r: any) => ({
           id: r.id,
+          name: r.expand?.user?.name ?? r.email,
           email: r.email,
           role: r.role,
           invitedBy: r.expand?.invited_by ?? {
@@ -104,7 +107,7 @@ export default function WorkspacePage() {
             <Users className="h-5 w-5 text-indigo-600" />
             <h1 className="text-xl font-bold text-foreground">Workspace Members</h1>
           </div>
-          {isAdmin && (
+          {canInvite && (
             <div className="flex gap-2">
               <button
                 onClick={() => setShowInviteUser(true)}
@@ -113,13 +116,15 @@ export default function WorkspacePage() {
                 <Mail className="h-4 w-4" />
                 Invite User
               </button>
-              <button
-                onClick={() => setShowAccessManagement(true)}
-                className="flex items-center gap-2 px-4 py-2 rounded-md border border-border bg-white text-foreground text-sm font-medium hover:bg-accent transition-colors"
-              >
-                <Shield className="h-4 w-4" />
-                Access Management
-              </button>
+              {isAdmin && (
+                <button
+                  onClick={() => setShowAccessManagement(true)}
+                  className="flex items-center gap-2 px-4 py-2 rounded-md border border-border bg-white text-foreground text-sm font-medium hover:bg-accent transition-colors"
+                >
+                  <Shield className="h-4 w-4" />
+                  Access Management
+                </button>
+              )}
             </div>
           )}
         </div>
@@ -153,8 +158,8 @@ export default function WorkspacePage() {
           </div>
         </div>
 
-        {/* Pending invites (Admin only) */}
-        {isAdmin && (
+        {/* Pending invites (Admin and Manager) */}
+        {canInvite && (
           <div>
             <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wide mb-3">
               Pending Invites — {pendingInvites.length}
@@ -174,7 +179,8 @@ export default function WorkspacePage() {
                       <UserPlus className="h-4 w-4 text-amber-700" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-foreground truncate">{invite.email}</p>
+                      <p className="text-sm font-medium text-foreground truncate">{invite.name}</p>
+                      <p className="text-xs text-muted-foreground truncate">{invite.email}</p>
                       <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                         <Clock className="h-3 w-3" />
                         Expires {new Date(invite.expiresAt).toLocaleDateString()}
@@ -200,9 +206,9 @@ export default function WorkspacePage() {
           </div>
         )}
 
-        {!isAdmin && (
+        {!canInvite && (
           <p className="text-xs text-muted-foreground">
-            Only Admins can invite users and manage access.
+            Only Admins and Managers can invite users.
           </p>
         )}
       </div>
@@ -240,6 +246,7 @@ function InviteUserDialog({
   onClose: () => void;
   onSuccess: () => Promise<void>;
 }) {
+  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<Role>("Member");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -258,7 +265,7 @@ function InviteUserDialog({
           "Content-Type": "application/json",
           Authorization: `Bearer ${pb.authStore.token}`,
         },
-        body: JSON.stringify({ email: email.trim(), role }),
+        body: JSON.stringify({ name: name.trim(), email: email.trim(), role }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error ?? "Failed to send invite");
@@ -291,8 +298,8 @@ function InviteUserDialog({
             </div>
             <p className="text-sm font-medium text-foreground">Invite sent!</p>
             <p className="text-xs text-muted-foreground">
-              A sign-in code has been sent to <strong>{email}</strong>.
-              They can use it to set up their account.
+              An invitation email has been sent to <strong>{email}</strong>.
+              They can log in using their email and a one-time code.
             </p>
             <button
               onClick={onClose}
@@ -310,6 +317,22 @@ function InviteUserDialog({
             )}
 
             <div>
+              <label htmlFor="invite-name" className="block text-sm font-medium text-foreground mb-1">
+                Full name
+              </label>
+              <input
+                id="invite-name"
+                type="text"
+                value={name}
+                onChange={(e) => { setName(e.target.value); setError(null); }}
+                placeholder="Jane Doe"
+                required
+                autoFocus
+                className="w-full px-3 py-2 rounded-md border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              />
+            </div>
+
+            <div>
               <label htmlFor="invite-email" className="block text-sm font-medium text-foreground mb-1">
                 Email address
               </label>
@@ -318,14 +341,10 @@ function InviteUserDialog({
                 type="email"
                 value={email}
                 onChange={(e) => { setEmail(e.target.value); setError(null); }}
-                placeholder="colleague@company.com"
+                placeholder="jane@company.com"
                 required
-                autoFocus
                 className="w-full px-3 py-2 rounded-md border border-border bg-white text-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500"
               />
-              <p className="text-xs text-muted-foreground mt-1">
-                A sign-in code will be sent to this address.
-              </p>
             </div>
 
             <div>
@@ -356,7 +375,7 @@ function InviteUserDialog({
               </button>
               <button
                 type="submit"
-                disabled={isSubmitting || !email.trim()}
+                disabled={isSubmitting || !name.trim() || !email.trim()}
                 className="flex-1 px-4 py-2 rounded-md bg-indigo-600 text-white font-medium hover:bg-indigo-700 transition-colors disabled:opacity-50 text-sm flex items-center justify-center gap-2"
               >
                 {isSubmitting ? "Sending..." : <><Mail className="h-4 w-4" />Send invite</>}
