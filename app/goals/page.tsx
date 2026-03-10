@@ -6,7 +6,7 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { canManageGoal } from "@/lib/permissions";
-import { Epic, Goal, GoalStatus, Task } from "@/lib/types";
+import { Epic, Goal, GoalStatus } from "@/lib/types";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -29,7 +29,6 @@ function epicIsAtRisk(epic: Epic): boolean {
 function deriveGoalStatus(
   goal: Goal,
   epics: Epic[],
-  tasks: Task[],
 ): GoalStatus {
   const linked = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
   if (linked.length === 0) return "On Track";
@@ -51,7 +50,7 @@ const STATUS_ICONS: Record<GoalStatus, React.ElementType> = {
 };
 
 export default function GoalsPage() {
-  const { goals, epics, tasks, deleteGoal } = useDataStore();
+  const { goals, epics, deleteGoal } = useDataStore();
   const { currentUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
@@ -116,7 +115,7 @@ export default function GoalsPage() {
           ) : (
             <div className="space-y-3">
               {goals.map((goal) => {
-                const status = deriveGoalStatus(goal, epics, tasks);
+                const status = deriveGoalStatus(goal, epics);
                 const StatusIcon = STATUS_ICONS[status];
                 const linkedEpics = epics.filter((e) =>
                   goal.linkedEpicIds.includes(e.id),

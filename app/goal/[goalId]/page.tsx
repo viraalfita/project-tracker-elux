@@ -8,7 +8,7 @@ import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { canManageGoal } from "@/lib/permissions";
-import { Epic, Goal, GoalKpi, GoalStatus, Task } from "@/lib/types";
+import { Epic, Goal, GoalKpi, GoalStatus } from "@/lib/types";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -39,7 +39,6 @@ function epicIsAtRisk(epic: Epic): boolean {
 function deriveGoalStatus(
   goal: Goal,
   epics: Epic[],
-  tasks: Task[],
 ): GoalStatus {
   const linked = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
   if (linked.length === 0) return "On Track";
@@ -69,7 +68,6 @@ export default function GoalPage({ params }: GoalPageProps) {
   const {
     goals,
     epics,
-    tasks,
     addGoalKpi,
     updateGoalKpi,
     deleteGoalKpi,
@@ -87,7 +85,7 @@ export default function GoalPage({ params }: GoalPageProps) {
   if (!goal) notFound();
 
   const canManage = canManageGoal(currentUser);
-  const goalStatus = deriveGoalStatus(goal, epics, tasks);
+  const goalStatus = deriveGoalStatus(goal, epics);
   const GoalStatusIcon = GOAL_STATUS_ICONS[goalStatus];
   const linkedEpics = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
 
