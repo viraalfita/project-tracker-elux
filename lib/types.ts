@@ -53,6 +53,7 @@ export interface Task {
   assignee: User | null;
   status: TaskStatus;
   priority: Priority;
+  startDate?: string; // YYYY-MM-DD, derived from created timestamp
   dueDate: string;
   estimate?: number;
   order?: number;

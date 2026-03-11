@@ -3,7 +3,6 @@
 import { EpicCard } from "@/components/dashboard/EpicCard";
 import { EpicFormDialog } from "@/components/epic/EpicFormDialog";
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { StatusBadge } from "@/components/shared/StatusBadge";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { canManageEpics, isUserInvolvedInEpic } from "@/lib/permissions";
@@ -53,17 +52,6 @@ export default function EpicsPage() {
               All Epics — {visibleEpics.length}
             </h2>
             <div className="flex items-center gap-3">
-              <div className="flex gap-2">
-                {(
-                  ["Not Started", "In Progress", "On Hold", "Done"] as const
-                ).map((s) => {
-                  const count = visibleEpics.filter(
-                    (e) => e.status === s,
-                  ).length;
-                  if (count === 0) return null;
-                  return <StatusBadge key={s} status={s} />;
-                })}
-              </div>
               {allowNewEpic && (
                 <button
                   onClick={() => setShowNewEpic(true)}

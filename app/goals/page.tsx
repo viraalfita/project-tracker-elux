@@ -6,7 +6,8 @@ import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { canManageGoal } from "@/lib/permissions";
-import { Epic, Goal, GoalStatus } from "@/lib/types";
+import { Epic, Goal, GoalStatus, Task } from "@/lib/types";
+import { getEpicHealth } from "@/lib/utils";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -18,19 +19,21 @@ import {
 import Link from "next/link";
 import { useState } from "react";
 
-const NOW = new Date();
-NOW.setHours(0, 0, 0, 0);
-
-function epicIsAtRisk(epic: Epic): boolean {
-  if (!epic.endDate || epic.status === "Done") return false;
-  return new Date(epic.endDate) < NOW;
-}
-
-function deriveGoalStatus(goal: Goal, epics: Epic[]): GoalStatus {
+function deriveGoalStatus(
+  goal: Goal,
+  epics: Epic[],
+  tasks: Task[],
+): GoalStatus {
   const linked = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
   if (linked.length === 0) return "On Track";
   if (linked.every((e) => e.status === "Done")) return "Completed";
-  const anyAtRisk = linked.some((epic) => epicIsAtRisk(epic));
+  const anyAtRisk = linked.some((epic) => {
+    const h = getEpicHealth(
+      epic,
+      tasks.filter((t) => t.epicId === epic.id),
+    );
+    return h === "At Risk" || h === "Delayed";
+  });
   return anyAtRisk ? "At Risk" : "On Track";
 }
 
@@ -47,7 +50,7 @@ const STATUS_ICONS: Record<GoalStatus, React.ElementType> = {
 };
 
 export default function GoalsPage() {
-  const { goals, epics, deleteGoal } = useDataStore();
+  const { goals, epics, tasks, deleteGoal } = useDataStore();
   const { currentUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
   const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
@@ -112,7 +115,7 @@ export default function GoalsPage() {
           ) : (
             <div className="space-y-3">
               {goals.map((goal) => {
-                const status = deriveGoalStatus(goal, epics);
+                const status = deriveGoalStatus(goal, epics, tasks);
                 const StatusIcon = STATUS_ICONS[status];
                 const linkedEpics = epics.filter((e) =>
                   goal.linkedEpicIds.includes(e.id),

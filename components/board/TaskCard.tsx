@@ -4,7 +4,7 @@ import { AvatarChip, UnassignedChip } from "@/components/shared/AvatarChip";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { useDataStore } from "@/contexts/DataStore";
 import { Task } from "@/lib/types";
-import { isTaskOverdue } from "@/lib/utils";
+import { getTaskHealth, isTaskOverdue } from "@/lib/utils";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { AlertTriangle, CalendarDays, Clock } from "lucide-react";
@@ -22,6 +22,7 @@ export function TaskCard({ task, canDragDrop }: TaskCardProps) {
   now.setHours(0, 0, 0, 0);
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
   const isOverdue = isTaskOverdue(task.dueDate, task.status);
+  const health = getTaskHealth(task);
   const isDueSoon =
     !isOverdue &&
     dueDate !== null &&
@@ -114,6 +115,22 @@ export function TaskCard({ task, canDragDrop }: TaskCardProps) {
           </span>
         )}
       </div>
+
+      {/* Health badge — only when progress is lagging (not already shown as Overdue) */}
+      {health !== "On Track" && !isOverdue && (
+        <div className="mt-2 pt-2 border-t border-border">
+          <span
+            className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded ${
+              health === "Delayed"
+                ? "bg-red-100 text-red-600"
+                : "bg-orange-100 text-orange-700"
+            }`}
+          >
+            <AlertTriangle className="h-3 w-3" />
+            {health}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

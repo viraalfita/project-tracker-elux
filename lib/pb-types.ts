@@ -31,6 +31,7 @@ export interface PBTask extends RecordModel {
   status: string;
   priority: string;
   due_date: string;
+  start_date?: string;
   estimate: number;
   order: number;
   epic: string;

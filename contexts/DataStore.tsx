@@ -110,11 +110,22 @@ interface DataStoreContextType {
     status?: TaskStatus;
     priority?: Priority;
     assigneeId?: string;
+    dueDate?: string;
+    startDate?: string;
   }) => Task;
   updateTask: (
     id: string,
     data: Partial<
-      Pick<Task, "title" | "description" | "status" | "priority" | "order" | "dueDate">
+      Pick<
+        Task,
+        | "title"
+        | "description"
+        | "status"
+        | "priority"
+        | "order"
+        | "dueDate"
+        | "startDate"
+      >
     > & { assigneeId?: string },
   ) => void;
   deleteTask: (id: string) => void;
@@ -568,6 +579,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       status?: TaskStatus;
       priority?: Priority;
       assigneeId?: string;
+      dueDate?: string;
+      startDate?: string;
     }): Task => {
       // Validate assigneeId: must be an epic member (owner or watcher)
       const epic = epics.find((e) => e.id === data.epicId);
@@ -590,7 +603,8 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
         assignee,
         status: data.status ?? "To Do",
         priority: data.priority ?? "Medium",
-        dueDate: "",
+        dueDate: data.dueDate ?? "",
+        startDate: data.startDate || undefined,
         subtasks: [],
         comments: [],
       };
@@ -606,6 +620,10 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
             epic: data.epicId,
             assignee: safeAssigneeId ?? null,
             owner: safeAssigneeId ?? null,
+            due_date: data.dueDate ? `${data.dueDate} 00:00:00.000Z` : null,
+            start_date: data.startDate
+              ? `${data.startDate} 00:00:00.000Z`
+              : null,
           },
           { expand: "owner,assignee" },
         )
@@ -626,7 +644,16 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
     (
       id: string,
       data: Partial<
-        Pick<Task, "title" | "description" | "status" | "priority" | "order" | "dueDate">
+        Pick<
+          Task,
+          | "title"
+          | "description"
+          | "status"
+          | "priority"
+          | "order"
+          | "dueDate"
+          | "startDate"
+        >
       > & { assigneeId?: string },
     ) => {
       // Compute a validated assigneeId by reading current tasks from functional state.
@@ -671,7 +698,13 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       if (data.priority !== undefined) payload.priority = data.priority;
       if (data.order !== undefined) payload.order = data.order;
       if (data.dueDate !== undefined)
-        payload.due_date = data.dueDate ? `${data.dueDate} 00:00:00.000Z` : null;
+        payload.due_date = data.dueDate
+          ? `${data.dueDate} 00:00:00.000Z`
+          : null;
+      if (data.startDate !== undefined)
+        payload.start_date = data.startDate
+          ? `${data.startDate} 00:00:00.000Z`
+          : null;
       // Only persist a valid assigneeId (resolvedAssigneeId is set to undefined if invalid)
       if (resolvedAssigneeId !== undefined) {
         payload.assignee = resolvedAssigneeId || null;

@@ -38,6 +38,83 @@ export function isTaskOverdue(
   return dueDate < getTodayStr() && status !== "Done";
 }
 
+/** Returns the difference in calendar days between two "YYYY-MM-DD" strings (a - b). */
+function diffDays(a: string, b: string): number {
+  return Math.round(
+    (new Date(a).getTime() - new Date(b).getTime()) / (1000 * 60 * 60 * 24),
+  );
+}
+
+export type HealthStatus = "On Track" | "At Risk" | "Delayed";
+
+/**
+ * IDEAL task health:
+ * - Delayed  → due date already passed and not Done
+ * - Compares actual progress vs expected progress based on elapsed time
+ *   gap > 40% → Delayed, gap > 20% → At Risk, else → On Track
+ * - Falls back to Simple (due date proximity) when startDate is unavailable
+ */
+export function getTaskHealth(task: Task): HealthStatus {
+  const today = getTodayStr();
+  const progress = getTaskProgress(task);
+
+  // Already overdue
+  if (task.dueDate && task.dueDate < today && task.status !== "Done")
+    return "Delayed";
+
+  // Done is always On Track
+  if (task.status === "Done") return "On Track";
+
+  if (task.startDate && task.dueDate) {
+    // IDEAL: expected progress based on elapsed time
+    const totalDays = diffDays(task.dueDate, task.startDate);
+    if (totalDays > 0) {
+      const elapsedDays = Math.max(diffDays(today, task.startDate), 0);
+      const expectedProgress = Math.min((elapsedDays / totalDays) * 100, 100);
+      const gap = expectedProgress - progress;
+      if (gap > 40) return "Delayed";
+      if (gap > 20) return "At Risk";
+      return "On Track";
+    }
+  }
+
+  // SIMPLE fallback: check proximity to due date
+  if (task.dueDate) {
+    const daysLeft = diffDays(task.dueDate, today);
+    if (daysLeft <= 3 && progress < 50) return "At Risk";
+  }
+
+  return "On Track";
+}
+
+/**
+ * IDEAL epic health:
+ * - Delayed  → endDate passed and not Done, OR ≥20% of tasks are Delayed
+ * - At Risk  → ≥30% of tasks are At Risk (and not already Delayed)
+ * - On Track → everything else
+ */
+export function getEpicHealth(
+  epic: { endDate?: string; status: string },
+  tasks: Task[],
+): HealthStatus {
+  const today = getTodayStr();
+
+  // Epic itself is overdue
+  if (epic.endDate && epic.endDate < today && epic.status !== "Done")
+    return "Delayed";
+
+  if (tasks.length === 0) return "On Track";
+
+  const delayed = tasks.filter((t) => getTaskHealth(t) === "Delayed").length;
+  const atRisk = tasks.filter((t) => getTaskHealth(t) === "At Risk").length;
+  const delayedPct = (delayed / tasks.length) * 100;
+  const atRiskPct = (atRisk / tasks.length) * 100;
+
+  if (delayedPct >= 20) return "Delayed";
+  if (atRiskPct >= 30) return "At Risk";
+  return "On Track";
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
 // TEAM WORKLOAD (IDLE RESOURCE) UTILITIES
 // Workload is measured by count of "In Progress" tasks per user
