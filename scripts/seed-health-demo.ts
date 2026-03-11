@@ -140,6 +140,7 @@ async function upsertEpic(
   title: string,
   endDate: string,
   ownerId: string,
+  watcherIds: string[] = [],
 ): Promise<string> {
   const existing = await pb
     .collection("epics")
@@ -157,7 +158,7 @@ async function upsertEpic(
     start_date: pbDate("2026-02-01"),
     end_date: pbDate(endDate),
     owner: ownerId,
-    watchers: [],
+    watchers: watcherIds,
   });
 
   console.log(`  Created epic "${title}" → ${record.id}`);
@@ -186,6 +187,7 @@ async function upsertTask(
   spec: TaskSpec,
   epicId: string,
   ownerId: string,
+  assigneeId: string,
 ): Promise<void> {
   const existing = await pb
     .collection("tasks")
@@ -200,12 +202,14 @@ async function upsertTask(
       await pb.collection("tasks").update(taskId, {
         start_date: spec.startDate ? pbDate(spec.startDate) : null,
         due_date: pbDate(spec.dueDate),
+        owner: ownerId,
+        assignee: assigneeId,
       });
     } catch {
       // ignore – field may not exist yet on older schema runs
     }
     console.log(
-      `  Task "${spec.title}" already exists — start_date patched. [expected: ${spec.expectedHealth}]`,
+      `  Task "${spec.title}" already exists — patched. [expected: ${spec.expectedHealth}]`,
     );
   } else {
     const payload: Record<string, unknown> = {
@@ -216,7 +220,7 @@ async function upsertTask(
       start_date: spec.startDate ? pbDate(spec.startDate) : null,
       epic: epicId,
       owner: ownerId,
-      assignee: ownerId,
+      assignee: assigneeId,
     };
 
     const record = await pb.collection("tasks").create(payload);
@@ -265,6 +269,25 @@ async function patchTasksCollectionSchema(): Promise<void> {
   console.log("  Added start_date field to tasks collection.\n");
 }
 
+// ─── Sync epic members from task assignees ───────────────────────────────────
+
+/** Reads all tasks for an epic, then adds their assignees as epic watchers. */
+async function syncEpicMembersFromTaskAssignees(epicId: string): Promise<void> {
+  const tasks = await pb
+    .collection("tasks")
+    .getFullList<{ assignee: string }>({ filter: `epic="${epicId}"` });
+  const assigneeIds = [
+    ...new Set(tasks.map((t) => t.assignee).filter(Boolean)),
+  ];
+  const epic = await pb.collection("epics").getOne(epicId);
+  const currentWatchers: string[] = epic.watchers ?? [];
+  const merged = [...new Set([...currentWatchers, ...assigneeIds])];
+  await pb.collection("epics").update(epicId, { watchers: merged });
+  console.log(
+    `  Added ${assigneeIds.length} task assignee(s) as epic members.\n`,
+  );
+}
+
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 async function main() {
@@ -274,19 +297,35 @@ async function main() {
     .authWithPassword(ADMIN_EMAIL, ADMIN_PASSWORD);
   console.log("Authenticated as superuser.\n");
 
-  // Use the first admin user as owner/assignee for all demo records
+  // ── Fetch all users and build rotation helper ─────────────────────────────
   const users = await pb
     .collection("users")
-    .getFullList<{ id: string; role: string }>();
-  const adminUser = users.find((u) => u.role === "Admin") ?? users[0];
-  if (!adminUser) {
+    .getFullList<{ id: string; role: string; name: string }>();
+  if (users.length === 0) {
     console.error("No users found. Run setup-pocketbase.ts first.");
     process.exit(1);
   }
-  const ownerId = adminUser.id;
+  const allIds = users.map((u) => u.id);
+  const admins = users.filter((u) => u.role === "Admin");
+  const managers = users.filter((u) => u.role === "Manager");
   console.log(
-    `Using user ${ownerId} as owner/assignee for all demo records.\n`,
+    `Found ${users.length} users: ${users.map((u) => u.name).join(", ")}\n`,
   );
+
+  // Round-robin owner/assignee — offset by 1 so they're never the same
+  let taskIdx = 0;
+  const pick = (offset = 0) => allIds[(taskIdx + offset) % allIds.length];
+  const tick = () => {
+    taskIdx++;
+  };
+
+  // Epic owners: spread across roles
+  const epicOwners = [
+    (admins[0] ?? users[0]).id,
+    (managers[0] ?? users[0]).id,
+    (admins[1] ?? admins[0] ?? users[0]).id,
+    (managers[1] ?? managers[0] ?? users[0]).id,
+  ];
 
   // ── Patch tasks collection schema to add start_date ─────────────────────
   console.log("── Patching tasks collection schema ──────────────────────────");
@@ -301,9 +340,9 @@ async function main() {
   const epicAId = await upsertEpic(
     "Health Demo: On Track",
     "2026-05-31",
-    ownerId,
+    epicOwners[0],
+    allIds.filter((id) => id !== epicOwners[0]).slice(0, 2),
   );
-
   await upsertTask(
     {
       title: "[A1] Setup CI/CD Pipeline",
@@ -312,13 +351,13 @@ async function main() {
       doneSubtasks: 7,
       totalSubtasks: 10,
       expectedHealth: "On Track",
-      // elapsed=10, total=24, expected=41.7%, actual=70%, gap=-28.3%
-      reason: "gap = 41.7% - 70% = -28.3%  (ahead of schedule)",
+      reason: "gap=41.7%-70%=-28.3% (ahead)",
     },
     epicAId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[A2] Write API Documentation",
@@ -327,13 +366,13 @@ async function main() {
       doneSubtasks: 5,
       totalSubtasks: 10,
       expectedHealth: "On Track",
-      // elapsed=6, total=25, expected=24%, actual=50%, gap=-26%
-      reason: "gap = 24% - 50% = -26%  (ahead of schedule)",
+      reason: "gap=24%-50%=-26% (ahead)",
     },
     epicAId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[A3] Design System Tokens",
@@ -342,13 +381,14 @@ async function main() {
       doneSubtasks: 6,
       totalSubtasks: 10,
       expectedHealth: "On Track",
-      // elapsed=14, total=44, expected=31.8%, actual=60%, gap=-28.2%
-      reason: "gap = 31.8% - 60% = -28.2%  (ahead of schedule)",
+      reason: "gap=31.8%-60%=-28.2% (ahead)",
     },
     epicAId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
+  await syncEpicMembersFromTaskAssignees(epicAId);
   console.log("  → Expected epic health: ON TRACK  (0% delayed, 0% at-risk)\n");
 
   // ── EPIC B — At Risk ───────────────────────────────────────────────────────
@@ -356,9 +396,9 @@ async function main() {
   const epicBId = await upsertEpic(
     "Health Demo: At Risk",
     "2026-04-30",
-    ownerId,
+    epicOwners[1],
+    allIds.filter((id) => id !== epicOwners[1]).slice(0, 2),
   );
-
   await upsertTask(
     {
       title: "[B1] Build Authentication Service",
@@ -367,13 +407,13 @@ async function main() {
       doneSubtasks: 3,
       totalSubtasks: 10,
       expectedHealth: "At Risk",
-      // elapsed=19, total=33, expected=57.6%, actual=30%, gap=+27.6%
-      reason: "gap = 57.6% - 30% = +27.6%  (20 < gap ≤ 40 → AT RISK)",
+      reason: "gap=57.6%-30%=+27.6% (AT RISK)",
     },
     epicBId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[B2] Integrate Payment SDK",
@@ -382,13 +422,13 @@ async function main() {
       doneSubtasks: 3,
       totalSubtasks: 10,
       expectedHealth: "At Risk",
-      // elapsed=10, total=19, expected=52.6%, actual=30%, gap=+22.6%
-      reason: "gap = 52.6% - 30% = +22.6%  (20 < gap ≤ 40 → AT RISK)",
+      reason: "gap=52.6%-30%=+22.6% (AT RISK)",
     },
     epicBId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[B3] Database Schema Migration",
@@ -397,13 +437,13 @@ async function main() {
       doneSubtasks: 4,
       totalSubtasks: 10,
       expectedHealth: "On Track",
-      // elapsed=10, total=29, expected=34.5%, actual=40%, gap=-5.5%
-      reason: "gap = 34.5% - 40% = -5.5%  (on track, slightly ahead)",
+      reason: "gap=34.5%-40%=-5.5% (ahead)",
     },
     epicBId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[B4] Load Testing Suite",
@@ -412,13 +452,13 @@ async function main() {
       doneSubtasks: 5,
       totalSubtasks: 10,
       expectedHealth: "On Track",
-      // elapsed=6, total=41, expected=14.6%, actual=50%, gap=-35.4%
-      reason: "gap = 14.6% - 50% = -35.4%  (well ahead of schedule)",
+      reason: "gap=14.6%-50%=-35.4% (well ahead)",
     },
     epicBId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[B5] Security Audit",
@@ -427,13 +467,14 @@ async function main() {
       doneSubtasks: 3,
       totalSubtasks: 6,
       expectedHealth: "On Track",
-      // elapsed=3, total=43, expected=7%, actual=50%, gap=-43%
-      reason: "gap = 7% - 50% = -43%  (way ahead, just started)",
+      reason: "gap=7%-50%=-43% (just started, ahead)",
     },
     epicBId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
+  await syncEpicMembersFromTaskAssignees(epicBId);
   console.log(
     "  → Expected epic health: AT RISK  (0% delayed, 2/5 = 40% at-risk ≥ 30%)\n",
   );
@@ -442,10 +483,10 @@ async function main() {
   console.log("── Epic C: Health Demo: Delayed (EndDate Passed) ─────────────");
   const epicCId = await upsertEpic(
     "Health Demo: Delayed (EndDate)",
-    "2026-03-05", // past date → epic.endDate < today
-    ownerId,
+    "2026-03-05",
+    epicOwners[2],
+    allIds.filter((id) => id !== epicOwners[2]).slice(0, 2),
   );
-
   await upsertTask(
     {
       title: "[C1] Frontend Component Refactor",
@@ -454,13 +495,13 @@ async function main() {
       doneSubtasks: 2,
       totalSubtasks: 5,
       expectedHealth: "On Track",
-      // elapsed=10, total=19, expected=52.6%, actual=40%, gap=+12.6%
-      reason: "gap = 52.6% - 40% = +12.6%  (gap ≤ 20 → on track by itself)",
+      reason: "gap=52.6%-40%=+12.6% (≤20, on track)",
     },
     epicCId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[C2] Database Index Optimization",
@@ -469,13 +510,14 @@ async function main() {
       doneSubtasks: 1,
       totalSubtasks: 4,
       expectedHealth: "On Track",
-      // elapsed=10, total=24, expected=41.7%, actual=25%, gap=+16.7%
-      reason: "gap = 41.7% - 25% = +16.7%  (gap ≤ 20 → on track by itself)",
+      reason: "gap=41.7%-25%=+16.7% (≤20, on track)",
     },
     epicCId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
+  await syncEpicMembersFromTaskAssignees(epicCId);
   console.log(
     "  → Expected epic health: DELAYED  (endDate 2026-03-05 < today 2026-03-11)",
   );
@@ -487,40 +529,40 @@ async function main() {
   console.log("── Epic D: Health Demo: Delayed (Task Aggregation) ───────────");
   const epicDId = await upsertEpic(
     "Health Demo: Delayed (Tasks)",
-    "2026-05-31", // far future — delay comes from tasks, not endDate
-    ownerId,
+    "2026-05-31",
+    epicOwners[3],
+    allIds.filter((id) => id !== epicOwners[3]).slice(0, 2),
   );
-
   await upsertTask(
     {
       title: "[D1] Deploy Microservices",
-      // No startDate — dueDate is already past, overdue branch fires first
       dueDate: "2026-03-08",
       status: "In Progress",
       doneSubtasks: 1,
       totalSubtasks: 8,
       expectedHealth: "Delayed",
-      reason: "dueDate 2026-03-08 < today 2026-03-11 → hard OVERDUE → DELAYED",
+      reason: "dueDate past → OVERDUE → DELAYED",
     },
     epicDId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[D2] Kubernetes Cluster Setup",
-      // No startDate — dueDate is already past
       dueDate: "2026-03-10",
       status: "In Progress",
       doneSubtasks: 1,
       totalSubtasks: 8,
       expectedHealth: "Delayed",
-      reason: "dueDate 2026-03-10 < today 2026-03-11 → hard OVERDUE → DELAYED",
+      reason: "dueDate past → OVERDUE → DELAYED",
     },
     epicDId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[D3] Monitoring Dashboard",
@@ -529,13 +571,13 @@ async function main() {
       doneSubtasks: 2,
       totalSubtasks: 8,
       expectedHealth: "At Risk",
-      // elapsed=19, total=33, expected=57.6%, actual=25%, gap=+32.6%
-      reason: "gap = 57.6% - 25% = +32.6%  (20 < gap ≤ 40 → AT RISK)",
+      reason: "gap=57.6%-25%=+32.6% (AT RISK)",
     },
     epicDId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[D4] Disaster Recovery Plan",
@@ -544,13 +586,13 @@ async function main() {
       doneSubtasks: 3,
       totalSubtasks: 8,
       expectedHealth: "On Track",
-      // elapsed=6, total=56, expected=10.7%, actual=37.5%, gap=-26.8%
-      reason: "gap = 10.7% - 37.5% = -26.8%  (well ahead of schedule)",
+      reason: "gap=10.7%-37.5%=-26.8% (well ahead)",
     },
     epicDId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
   await upsertTask(
     {
       title: "[D5] Alerting & Notifications",
@@ -559,13 +601,14 @@ async function main() {
       doneSubtasks: 4,
       totalSubtasks: 8,
       expectedHealth: "On Track",
-      // elapsed=10, total=45, expected=22.2%, actual=50%, gap=-27.8%
-      reason: "gap = 22.2% - 50% = -27.8%  (ahead of schedule)",
+      reason: "gap=22.2%-50%=-27.8% (ahead)",
     },
     epicDId,
-    ownerId,
+    pick(0),
+    pick(1),
   );
-
+  tick();
+  await syncEpicMembersFromTaskAssignees(epicDId);
   console.log("  → Expected epic health: DELAYED  (2/5 = 40% delayed ≥ 20%)");
   console.log(
     "    endDate is future (2026-05-31), but too many tasks are overdue.\n",

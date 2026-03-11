@@ -7,7 +7,13 @@ import { Task } from "@/lib/types";
 import { getTaskHealth, isTaskOverdue } from "@/lib/utils";
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { AlertTriangle, CalendarDays, Clock } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  Clock,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 
 interface TaskCardProps {
@@ -116,21 +122,33 @@ export function TaskCard({ task, canDragDrop }: TaskCardProps) {
         )}
       </div>
 
-      {/* Health badge — only when progress is lagging (not already shown as Overdue) */}
-      {health !== "On Track" && !isOverdue && (
-        <div className="mt-2 pt-2 border-t border-border">
-          <span
-            className={`inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded ${
-              health === "Delayed"
-                ? "bg-red-100 text-red-600"
-                : "bg-orange-100 text-orange-700"
-            }`}
-          >
-            <AlertTriangle className="h-3 w-3" />
-            {health}
+      {/* Health badge — always shown */}
+      <div className="mt-2 pt-2 border-t border-border">
+        {health === "On Track" && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-green-50 text-green-700 ring-1 ring-green-200">
+            <TrendingUp className="h-3 w-3" />
+            On Track
           </span>
-        </div>
-      )}
+        )}
+        {health === "At Risk" && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+            <AlertTriangle className="h-3 w-3" />
+            At Risk
+          </span>
+        )}
+        {health === "Delayed" && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-600">
+            <AlertTriangle className="h-3 w-3" />
+            Delayed
+          </span>
+        )}
+        {health === "Completed" && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-green-50 text-green-700 ring-1 ring-green-200">
+            <CheckCircle2 className="h-3 w-3" />
+            Completed
+          </span>
+        )}
+      </div>
     </div>
   );
 }
