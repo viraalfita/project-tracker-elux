@@ -17,7 +17,12 @@ import {
 } from "@/lib/permissions";
 import { TaskStatus, User } from "@/lib/types";
 import { getTaskHealth } from "@/lib/utils";
-import { AlertTriangle, CalendarDays, CheckCircle2, TrendingUp } from "lucide-react";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  TrendingUp,
+} from "lucide-react";
 import { notFound } from "next/navigation";
 import { use, useState } from "react";
 
@@ -29,8 +34,7 @@ interface TaskPageProps {
 
 export default function TaskPage({ params }: TaskPageProps) {
   const { taskId } = use(params);
-  const { tasks, epics, users, updateTask } =
-    useDataStore();
+  const { tasks, epics, users, updateTask } = useDataStore();
   const { currentUser } = useAuth();
 
   const task = tasks.find((t) => t.id === taskId);
@@ -213,7 +217,6 @@ export default function TaskPage({ params }: TaskPageProps) {
                   </span>
                 </div>
               )}
-
             </div>
           </div>
 
