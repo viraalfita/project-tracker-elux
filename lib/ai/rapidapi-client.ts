@@ -16,6 +16,16 @@ export interface LLMParseResult {
   reply_to_user: string;
 }
 
+export interface RapidApiCreditRateLimit {
+  credit_limit: number | null;
+  credit_remaining: number | null;
+}
+
+export interface ParseForIntentResult {
+  parsed: LLMParseResult;
+  rateLimit: RapidApiCreditRateLimit | null;
+}
+
 // ── Per-intent system prompts ────────────────────────────────────────────
 
 const INTENT_PROMPTS: Record<string, string> = {
@@ -306,7 +316,7 @@ export const SUPPORTED_INTENTS = new Set(Object.keys(INTENT_REQUIRED_FIELDS));
 
 async function callRapidAPI(
   messages: Array<{ role: string; content: string }>,
-): Promise<LLMParseResult> {
+): Promise<ParseForIntentResult> {
   const response = await fetch(RAPIDAPI_URL, {
     method: "POST",
     headers: {
@@ -334,7 +344,20 @@ async function callRapidAPI(
   const jsonMatch = content.match(/\{[\s\S]*\}/);
   if (!jsonMatch) throw new Error("LLM response did not contain valid JSON");
 
-  return JSON.parse(jsonMatch[0]) as LLMParseResult;
+  const readIntHeader = (name: string): number | null => {
+    const value = response.headers.get(name);
+    if (!value) return null;
+    const parsed = Number.parseInt(value, 10);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+
+  return {
+    parsed: JSON.parse(jsonMatch[0]) as LLMParseResult,
+    rateLimit: {
+      credit_limit: readIntHeader("x-ratelimit-credit-limit"),
+      credit_remaining: readIntHeader("x-ratelimit-credit-remaining"),
+    },
+  };
 }
 
 /**
@@ -345,7 +368,7 @@ export async function parseForIntent(
   intent: string,
   userMessage: string,
   currentPayload?: Record<string, unknown>,
-): Promise<LLMParseResult> {
+): Promise<ParseForIntentResult> {
   const systemPrompt = INTENT_PROMPTS[intent];
   if (!systemPrompt) throw new Error(`Unsupported intent: ${intent}`);
 

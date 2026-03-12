@@ -23,6 +23,12 @@ interface Message {
     | "ready_to_confirm"
     | "answer";
   summary?: SummaryData;
+  rateLimitPct?: number;
+}
+
+interface RateLimitData {
+  credit_limit: number | null;
+  credit_remaining: number | null;
 }
 
 const INTENT_GROUPS = [
@@ -108,6 +114,7 @@ const INTENT_HINTS: Record<string, string> = {
 
 const STORAGE_KEY = "ai_chat_history";
 const INTENT_KEY = "ai_selected_intent";
+const OPEN_KEY = "ai_chat_open";
 
 const INITIAL_MESSAGE: Message = {
   role: "assistant",
@@ -137,7 +144,10 @@ function loadMessages(): Message[] {
 }
 
 export function AiCommandChat() {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return localStorage.getItem(OPEN_KEY) === "true";
+  });
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [loading, setLoading] = useState(false);
@@ -170,6 +180,14 @@ export function AiCommandChat() {
       // ignore
     }
   }, [selectedIntent]);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(OPEN_KEY, String(open));
+    } catch {
+      // ignore
+    }
+  }, [open]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -241,6 +259,17 @@ export function AiCommandChat() {
 
       const data = await res.json();
       const reply = data.reply ?? "Terjadi kesalahan. Coba lagi.";
+      const creditLimit = (data.rate_limit as RateLimitData | undefined)
+        ?.credit_limit;
+      const creditRemaining = (data.rate_limit as RateLimitData | undefined)
+        ?.credit_remaining;
+      const rateLimitPct =
+        creditLimit && creditRemaining != null
+          ? Math.max(
+              0,
+              Math.min(100, Math.floor((creditRemaining / creditLimit) * 100)),
+            )
+          : undefined;
 
       setMessages((prev) => [
         ...prev,
@@ -249,6 +278,7 @@ export function AiCommandChat() {
           text: reply,
           status: data.status,
           summary: data.summary,
+          rateLimitPct,
         },
       ]);
       if (data.status === "success" || data.status === "answer") {
@@ -427,7 +457,14 @@ export function AiCommandChat() {
                       ✓ Berhasil
                     </span>
                     <button
-                      onClick={() => window.location.reload()}
+                      onClick={() => {
+                        try {
+                          localStorage.setItem(OPEN_KEY, "true");
+                        } catch {
+                          // ignore
+                        }
+                        window.location.reload();
+                      }}
                       className="block text-[10px] text-indigo-600 underline underline-offset-2 hover:text-indigo-800 transition-colors"
                     >
                       Refresh halaman untuk melihat data terbaru →
@@ -497,10 +534,24 @@ export function AiCommandChat() {
                     </div>
                   </div>
                 ) : (
-                  <p className="whitespace-pre-wrap leading-relaxed">
-                    {msg.text}
-                  </p>
+                  <div className="space-y-1">
+                    <p className="whitespace-pre-wrap leading-relaxed">
+                      {msg.text}
+                    </p>
+                    {msg.role === "assistant" && msg.rateLimitPct != null && (
+                      <p className="text-[10px] font-medium text-slate-400">
+                        Credit {msg.rateLimitPct}%
+                      </p>
+                    )}
+                  </div>
                 )}
+                {msg.status === "ready_to_confirm" &&
+                  msg.role === "assistant" &&
+                  msg.rateLimitPct != null && (
+                    <p className="mt-2 text-[10px] font-medium text-slate-400">
+                      Credit {msg.rateLimitPct}%
+                    </p>
+                  )}
               </div>
             ))}
 

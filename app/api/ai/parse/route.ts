@@ -33,6 +33,7 @@ import {
 import {
   INTENT_REQUIRED_FIELDS,
   parseForIntent,
+  RapidApiCreditRateLimit,
   SUPPORTED_INTENTS,
 } from "@/lib/ai/rapidapi-client";
 import { resolveEntityByTitle, resolveUserByName } from "@/lib/ai/validators";
@@ -422,12 +423,15 @@ export async function POST(request: NextRequest) {
 
   // ── LLM Parse ────────────────────────────────────────────────────────────
   let parsed;
+  let rateLimit: RapidApiCreditRateLimit | null = null;
   try {
-    parsed = await parseForIntent(
+    const parseResult = await parseForIntent(
       selectedIntent,
       userText,
       existingDraft?.draftJson.payload,
     );
+    parsed = parseResult.parsed;
+    rateLimit = parseResult.rateLimit;
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown LLM error";
     console.error("[AI parse] LLM call failed:", msg);
@@ -438,6 +442,12 @@ export async function POST(request: NextRequest) {
         status: "error",
       },
       { status: 502 },
+    );
+  }
+
+  function jsonWithRateLimit(body: Record<string, unknown>) {
+    return NextResponse.json(
+      rateLimit ? { ...body, rate_limit: rateLimit } : body,
     );
   }
 
@@ -470,7 +480,7 @@ export async function POST(request: NextRequest) {
       draftJson: { payload: mergedPayload, missing_fields: blockingMissing },
       status: "collecting_fields",
     });
-    return NextResponse.json({
+    return jsonWithRateLimit({
       reply: parsed.reply_to_user,
       status: "collecting_fields",
       missing_fields: blockingMissing,
@@ -1005,7 +1015,7 @@ export async function POST(request: NextRequest) {
         : "\u2022 Tidak ada task";
 
     clearDraft(userId);
-    return NextResponse.json({
+    return jsonWithRateLimit({
       status: "answer",
       reply:
         `📋 Epic: ${epic.title}\n` +
@@ -1053,7 +1063,7 @@ export async function POST(request: NextRequest) {
       .catch(() => 0);
 
     clearDraft(userId);
-    return NextResponse.json({
+    return jsonWithRateLimit({
       status: "answer",
       reply:
         `📌 Task: ${task.title}\n` +
@@ -1101,7 +1111,7 @@ export async function POST(request: NextRequest) {
         : [];
 
     clearDraft(userId);
-    return NextResponse.json({
+    return jsonWithRateLimit({
       status: "answer",
       reply:
         `🎯 Goal: ${goal.title}\n` +
@@ -1144,7 +1154,7 @@ export async function POST(request: NextRequest) {
       ?.title;
 
     clearDraft(userId);
-    return NextResponse.json({
+    return jsonWithRateLimit({
       status: "answer",
       reply:
         `☑️ Subtask: ${sub.title}\n` +
@@ -1167,7 +1177,7 @@ export async function POST(request: NextRequest) {
 
     if (tasks.length === 0) {
       clearDraft(userId);
-      return NextResponse.json({
+      return jsonWithRateLimit({
         status: "answer",
         reply: `👤 ${userRes.displayName} saat ini tidak memiliki task yang di-assign.`,
       });
@@ -1196,7 +1206,7 @@ export async function POST(request: NextRequest) {
     }
 
     clearDraft(userId);
-    return NextResponse.json({
+    return jsonWithRateLimit({
       status: "answer",
       reply: lines.join("\n"),
     });
@@ -1244,7 +1254,7 @@ export async function POST(request: NextRequest) {
     status: "ready",
   });
 
-  return NextResponse.json({
+  return jsonWithRateLimit({
     status: "ready_to_confirm",
     reply: "Konfirmasi perintah berikut sebelum disimpan:",
     summary: {
