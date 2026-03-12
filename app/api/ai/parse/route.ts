@@ -553,6 +553,13 @@ export async function POST(request: NextRequest) {
   const summaryRows: Array<{ label: string; value: string }> = [];
   let isDangerous = false;
 
+  function toTitleCase(str: string): string {
+    return str
+      .split(/\s+/)
+      .map((w) => w.charAt(0).toUpperCase() + w.slice(1))
+      .join(" ");
+  }
+
   if (
     selectedIntent === "create_epic" ||
     selectedIntent === "create_epic_with_tasks"
@@ -1194,6 +1201,39 @@ export async function POST(request: NextRequest) {
       reply: lines.join("\n"),
     });
   }
+  // Title Case: apply to payload titles saved to DB AND to the confirmation summary rows
+  if (mergedPayload.title) {
+    mergedPayload.title = toTitleCase(mergedPayload.title as string);
+  }
+  if (Array.isArray(mergedPayload.tasks)) {
+    mergedPayload.tasks = (
+      mergedPayload.tasks as Array<Record<string, unknown>>
+    ).map((t) => ({
+      ...t,
+      title: t.title ? toTitleCase(t.title as string) : t.title,
+    }));
+  }
+
+  for (const row of summaryRows) {
+    if (row.label.startsWith("Judul")) {
+      row.value = toTitleCase(row.value);
+    } else if (["Epic", "Task", "Subtask", "Goal"].includes(row.label)) {
+      row.value = toTitleCase(row.value);
+    } else if (row.label === "Epics") {
+      row.value = row.value.split(", ").map(toTitleCase).join(", ");
+    } else if (row.label === "Tasks") {
+      row.value = row.value
+        .split(" | ")
+        .map((part) => {
+          const sep = part.indexOf(" → ");
+          return sep === -1
+            ? toTitleCase(part)
+            : toTitleCase(part.slice(0, sep)) + part.slice(sep);
+        })
+        .join(" | ");
+    }
+  }
+
   saveDraft(userId, {
     intent: selectedIntent,
     draftJson: {

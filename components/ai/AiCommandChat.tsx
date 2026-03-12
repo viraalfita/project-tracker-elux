@@ -77,21 +77,22 @@ const INTENT_GROUPS = [
 
 const INTENT_HINTS: Record<string, string> = {
   create_epic:
-    "Contoh: buatkan epic Research Design Q3 dengan owner vira, mulai 1 jan, selesai 31 mar",
+    "Contoh: buatkan epic Research Design Q3 dengan owner vira, mulai 1 jan 2026, selesai 31 mar 2026. Ownernya Vira. Statusnya Not Started.",
   create_epic_with_tasks:
-    "Contoh: buatkan epic Rebrand mulai 1 jan dan selesai 31 mar, owner vira, task: design mockup assign dewi, coding API assign vira",
+    "Contoh: buatkan epic Rebrand mulai 1 jan 2026 dan selesai 31 mar 2026, owner vira, task: design mockup assign dewi, coding API assign vira",
   update_epic:
     "Contoh: ubah epic Research Design, ganti statusnya jadi In Progress",
   delete_epic: "Contoh: hapus epic Research Design Q3",
   create_task:
     "Contoh: buatkan task Design Mockup di epic Rebrand, assignee dewi, due 15 feb",
   update_task: "Contoh: ubah task Design Mockup, ganti prioritas jadi High",
-  delete_task: "Contoh: hapus task Design Mockup dari epic Rebrand",
+  delete_task: "Contoh: hapus task Design Mockup",
   create_subtask:
     "Contoh: buatkan subtask wireframe di task Design Mockup, assignee vira",
   update_subtask: "Contoh: ubah subtask wireframe, tandai sebagai Done",
   delete_subtask: "Contoh: hapus subtask wireframe dari task Design Mockup",
-  create_goal: "Contoh: buatkan goal Tingkatkan Revenue Q1, target 200%",
+  create_goal:
+    "Contoh: buatkan goal Tingkatkan Revenue Q1, tambahkan kpi conversion rate dan targetnya 200%, owner vira",
   update_goal: "Contoh: ubah goal Revenue Q1, perbarui status jadi At Risk",
   delete_goal: "Contoh: hapus goal Revenue Q1",
   link_epic_to_goal:
