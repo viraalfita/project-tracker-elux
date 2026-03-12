@@ -53,6 +53,7 @@ export interface Task {
   assignee: User | null;
   status: TaskStatus;
   priority: Priority;
+  startDate?: string; // YYYY-MM-DD, derived from created timestamp
   dueDate: string;
   estimate?: number;
   order?: number;
@@ -88,6 +89,7 @@ export type InviteStatus = "pending" | "accepted" | "expired";
 
 export interface Invite {
   id: string;
+  name: string;
   email: string;
   role: Role;
   invitedBy: User;

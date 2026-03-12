@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { canManageGoal } from "@/lib/permissions";
 import { Epic, Goal, GoalKpi, GoalStatus, Task } from "@/lib/types";
+import { getEpicHealth, HealthStatus } from "@/lib/utils";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -28,29 +29,22 @@ interface GoalPageProps {
   params: Promise<{ goalId: string }>;
 }
 
-const NOW = new Date();
-
-function epicIsAtRisk(epic: Epic, tasks: Task[]): boolean {
-  const epicTasks = tasks.filter((t) => t.epicId === epic.id);
-  const overdueCount = epicTasks.filter(
-    (t) => new Date(t.dueDate) < NOW && t.status !== "Done"
-  ).length;
-  const atRiskCount = epicTasks.filter(
-    (t) => t.status === "In Progress" && t.priority === "High"
-  ).length;
-  return overdueCount > 0 || atRiskCount > 0;
-}
-
-function deriveGoalStatus(goal: Goal, epics: Epic[], tasks: Task[]): GoalStatus {
+function deriveGoalStatus(
+  goal: Goal,
+  epics: Epic[],
+  tasks: Task[],
+): GoalStatus {
   const linked = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
   if (linked.length === 0) return "On Track";
   if (linked.every((e) => e.status === "Done")) return "Completed";
-  const anyAtRisk = linked.some((epic) => epicIsAtRisk(epic, tasks));
+  const anyAtRisk = linked.some((epic) => {
+    const h = getEpicHealth(
+      epic,
+      tasks.filter((t) => t.epicId === epic.id),
+    );
+    return h === "At Risk" || h === "Delayed";
+  });
   return anyAtRisk ? "At Risk" : "On Track";
-}
-
-function getEpicHealth(epic: Epic, tasks: Task[]): "At Risk" | "On Track" {
-  return epicIsAtRisk(epic, tasks) ? "At Risk" : "On Track";
 }
 
 const GOAL_STATUS_STYLES: Record<GoalStatus, string> = {
@@ -334,7 +328,10 @@ export default function GoalPage({ params }: GoalPageProps) {
             ) : (
               <div className="divide-y divide-border">
                 {linkedEpics.map((epic) => {
-                  const health = getEpicHealth(epic, tasks);
+                  const health: HealthStatus = getEpicHealth(
+                    epic,
+                    tasks.filter((t) => t.epicId === epic.id),
+                  );
                   return (
                     <div
                       key={epic.id}
@@ -354,15 +351,17 @@ export default function GoalPage({ params }: GoalPageProps) {
                           <StatusBadge status={epic.status} />
                           <span
                             className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
-                              health === "At Risk"
-                                ? "bg-orange-100 text-orange-700"
-                                : "bg-green-100 text-green-700"
+                              health === "Delayed"
+                                ? "bg-red-100 text-red-700"
+                                : health === "At Risk"
+                                  ? "bg-orange-100 text-orange-700"
+                                  : "bg-green-100 text-green-700"
                             }`}
                           >
-                            {health === "At Risk" ? (
-                              <AlertTriangle className="h-3 w-3" />
-                            ) : (
+                            {health === "On Track" ? (
                               <TrendingUp className="h-3 w-3" />
+                            ) : (
+                              <AlertTriangle className="h-3 w-3" />
                             )}
                             {health}
                           </span>

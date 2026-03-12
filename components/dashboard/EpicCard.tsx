@@ -9,9 +9,17 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
 import { canEditEpicMeta, isAdmin } from "@/lib/permissions";
-import { getTaskProgress } from "@/lib/utils";
 import { Epic } from "@/lib/types";
-import { CalendarDays, ChevronRight, Pencil, Trash2 } from "lucide-react";
+import { getEpicHealth, getTaskProgress } from "@/lib/utils";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Pencil,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -30,14 +38,19 @@ export function EpicCard({ epic }: EpicCardProps) {
   // Live task counts from the store
   const liveTasks = tasks.filter((t) => t.epicId === epic.id);
   const doneTasks = liveTasks.filter((t) => t.status === "Done").length;
-  const progress = liveTasks.length === 0 ? 0 : Math.round(
-    liveTasks.reduce((sum, t) => sum + getTaskProgress(t), 0) / liveTasks.length
-  );
+  const progress =
+    liveTasks.length === 0
+      ? 0
+      : Math.round(
+          liveTasks.reduce((sum, t) => sum + getTaskProgress(t), 0) /
+            liveTasks.length,
+        );
+
+  const health = getEpicHealth(epic, liveTasks);
 
   const allowEdit = canEditEpicMeta(currentUser, epic);
   // Epic deletion is restricted to owner + Admin
-  const allowDelete =
-    isAdmin(currentUser) || currentUser?.id === epic.owner.id;
+  const allowDelete = isAdmin(currentUser) || currentUser?.id === epic.owner.id;
 
   function handleDelete() {
     deleteEpic(epic.id);
@@ -51,11 +64,37 @@ export function EpicCard({ epic }: EpicCardProps) {
         <div className="group rounded-lg border border-border bg-white p-5 hover:shadow-sm hover:border-indigo-200 transition-all cursor-pointer">
           <div className="flex items-start justify-between gap-4">
             <div className="min-w-0 flex-1">
-              <div className="flex items-center gap-2 mb-1">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
                 <h3 className="text-base font-semibold text-foreground truncate group-hover:text-indigo-700 transition-colors">
                   {epic.title}
                 </h3>
                 <StatusBadge status={epic.status} />
+                {epic.status !== "Done" && (
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ${
+                      health === "Delayed"
+                        ? "bg-red-100 text-red-700"
+                        : health === "At Risk"
+                          ? "bg-orange-100 text-orange-700"
+                          : "bg-green-100 text-green-700"
+                    }`}
+                  >
+                    {health === "Delayed" ? (
+                      <AlertTriangle className="h-3 w-3" />
+                    ) : health === "At Risk" ? (
+                      <AlertTriangle className="h-3 w-3" />
+                    ) : (
+                      <TrendingUp className="h-3 w-3" />
+                    )}
+                    {health}
+                  </span>
+                )}
+                {epic.status === "Done" && (
+                  <span className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium bg-green-100 text-green-700">
+                    <CheckCircle2 className="h-3 w-3" />
+                    Completed
+                  </span>
+                )}
               </div>
               <p className="text-sm text-muted-foreground line-clamp-2 mb-3">
                 {epic.description}

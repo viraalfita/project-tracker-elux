@@ -16,7 +16,13 @@ import {
   getAssignableUsers,
 } from "@/lib/permissions";
 import { TaskStatus, User } from "@/lib/types";
-import { CalendarDays } from "lucide-react";
+import { getTaskHealth } from "@/lib/utils";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  TrendingUp,
+} from "lucide-react";
 import { notFound } from "next/navigation";
 import { use, useState } from "react";
 
@@ -28,8 +34,7 @@ interface TaskPageProps {
 
 export default function TaskPage({ params }: TaskPageProps) {
   const { taskId } = use(params);
-  const { tasks, epics, users, updateTask } =
-    useDataStore();
+  const { tasks, epics, users, updateTask } = useDataStore();
   const { currentUser } = useAuth();
 
   const task = tasks.find((t) => t.id === taskId);
@@ -80,10 +85,41 @@ export default function TaskPage({ params }: TaskPageProps) {
             {/* Title + status */}
             <div className="flex items-start justify-between gap-4 mb-4">
               <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 mb-2 flex-wrap">
                   <h1 className="text-xl font-bold text-foreground leading-tight">
                     {task.title}
                   </h1>
+                  {(() => {
+                    const h = getTaskHealth(task);
+                    if (h === "On Track")
+                      return (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200 shrink-0">
+                          <TrendingUp className="h-3 w-3" />
+                          On Track
+                        </span>
+                      );
+                    if (h === "At Risk")
+                      return (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-orange-200 shrink-0">
+                          <AlertTriangle className="h-3 w-3" />
+                          At Risk
+                        </span>
+                      );
+                    if (h === "Delayed")
+                      return (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-red-200 shrink-0">
+                          <AlertTriangle className="h-3 w-3" />
+                          Delayed
+                        </span>
+                      );
+                    if (h === "Completed")
+                      return (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200 shrink-0">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Completed
+                        </span>
+                      );
+                  })()}
                 </div>
               </div>
               {/* Status selector — disabled for read-only roles */}
@@ -157,6 +193,19 @@ export default function TaskPage({ params }: TaskPageProps) {
                 </span>
               </div>
 
+              {/* Start date */}
+              {task.startDate && (
+                <div className="flex flex-col gap-1">
+                  <span className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+                    Start Date
+                  </span>
+                  <span className="flex items-center gap-1.5 text-sm text-foreground">
+                    <CalendarDays className="h-4 w-4 text-muted-foreground" />
+                    {task.startDate}
+                  </span>
+                </div>
+              )}
+
               {/* Epic */}
               {epic && (
                 <div className="flex flex-col gap-1">
@@ -168,7 +217,6 @@ export default function TaskPage({ params }: TaskPageProps) {
                   </span>
                 </div>
               )}
-
             </div>
           </div>
 

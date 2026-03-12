@@ -3,7 +3,13 @@
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
-import { calculateTeamWorkload, downloadKpiCsv, getTaskProgress } from "@/lib/utils";
+import {
+  calculateTeamWorkload,
+  downloadKpiCsv,
+  getEpicHealth,
+  getTaskProgress,
+  isTaskOverdue,
+} from "@/lib/utils";
 import {
   AlertCircle,
   AlertTriangle,
@@ -27,6 +33,7 @@ export default function DashboardPage() {
   const [kpiEpicFilter, setKpiEpicFilter] = useState("");
 
   const NOW = new Date();
+  NOW.setHours(0, 0, 0, 0);
   const isManager = currentUser?.role === "Manager";
   const isManagementView =
     currentUser?.role === "Admin" || currentUser?.role === "Manager";
@@ -34,9 +41,7 @@ export default function DashboardPage() {
   // For Managers, scope to only epics they own
   const scopedEpics = useMemo(
     () =>
-      isManager
-        ? epics.filter((e) => e.owner.id === currentUser?.id)
-        : epics,
+      isManager ? epics.filter((e) => e.owner.id === currentUser?.id) : epics,
     [epics, isManager, currentUser],
   );
 
@@ -69,10 +74,9 @@ export default function DashboardPage() {
   const doneTasks = kpiTasks.filter((t) => t.status === "Done").length;
 
   // Health indicators
-  const overdueCount = kpiTasks.filter((t) => {
-    const due = new Date(t.dueDate);
-    return due < NOW && t.status !== "Done";
-  }).length;
+  const overdueCount = kpiTasks.filter((t) =>
+    isTaskOverdue(t.dueDate, t.status),
+  ).length;
 
   const atRiskCount = kpiTasks.filter((t) => {
     return t.status === "In Progress" && t.priority === "High";
@@ -101,15 +105,15 @@ export default function DashboardPage() {
             epicTasks.reduce((sum, t) => sum + getTaskProgress(t), 0) /
               epicTasks.length,
           );
-    const overdue = epicTasks.filter((t) => {
-      const due = new Date(t.dueDate);
-      return due < NOW && t.status !== "Done";
-    }).length;
-    return { epic, progress, overdue, taskCount: epicTasks.length };
+    const overdue = epicTasks.filter((t) =>
+      isTaskOverdue(t.dueDate, t.status),
+    ).length;
+    const health = getEpicHealth(epic, epicTasks);
+    return { epic, progress, overdue, taskCount: epicTasks.length, health };
   });
 
   const epicsAtRisk = epicHealth.filter(
-    (e) => e.overdue > 0 || (e.progress < 30 && e.taskCount > 0),
+    (e) => e.health === "At Risk" || e.health === "Delayed",
   );
 
   return (
@@ -298,7 +302,7 @@ export default function DashboardPage() {
                   <div className="max-h-[168px] overflow-y-auto divide-y divide-border">
                     {epicsAtRisk
                       .slice(0, 3)
-                      .map(({ epic, progress, overdue }) => (
+                      .map(({ epic, progress, overdue, health }) => (
                         <Link
                           key={epic.id}
                           href={`/epic/${epic.id}`}
@@ -314,9 +318,15 @@ export default function DashboardPage() {
                               {progress < 30 && `${progress}% progress`}
                             </p>
                           </div>
-                          <span className="ml-3 inline-flex items-center gap-1 rounded-full bg-orange-100 px-2 py-0.5 text-xs font-medium text-orange-700 flex-shrink-0">
+                          <span
+                            className={`ml-3 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium flex-shrink-0 ${
+                              health === "Delayed"
+                                ? "bg-red-100 text-red-700"
+                                : "bg-orange-100 text-orange-700"
+                            }`}
+                          >
                             <AlertTriangle className="h-3 w-3" />
-                            At Risk
+                            {health}
                           </span>
                         </Link>
                       ))}

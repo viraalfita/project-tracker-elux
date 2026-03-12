@@ -1,31 +1,47 @@
 "use client";
 
-// NOTE: OTP login is temporarily disabled. Password login is active.
-// To re-enable OTP: swap the form below for the OTP two-step flow
-// using requestOTP / verifyOTP from useAuth().
-
 import { useAuth } from "@/contexts/AuthContext";
-import { AlertCircle, FolderKanban, Loader2 } from "lucide-react";
+import { AlertCircle, ArrowLeft, FolderKanban, Loader2, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+type Step = "email" | "otp";
+
 export default function LoginPage() {
-  const { login } = useAuth();
+  const { requestOTP, verifyOTP } = useAuth();
   const router = useRouter();
+
+  const [step, setStep] = useState<Step>("email");
   const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  const [otpId, setOtpId] = useState("");
+  const [code, setCode] = useState("");
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
-  async function handleSubmit(e: React.SyntheticEvent) {
+  async function handleRequestOTP(e: React.SyntheticEvent) {
     e.preventDefault();
     setError("");
     setIsLoading(true);
     try {
-      await login(email, password);
+      const id = await requestOTP(email.trim());
+      setOtpId(id);
+      setStep("otp");
+    } catch {
+      setError("No account found for this email address.");
+    } finally {
+      setIsLoading(false);
+    }
+  }
+
+  async function handleVerifyOTP(e: React.SyntheticEvent) {
+    e.preventDefault();
+    setError("");
+    setIsLoading(true);
+    try {
+      await verifyOTP(otpId, code.trim());
       router.push("/dashboard");
     } catch {
-      setError("Invalid email or password");
+      setError("Invalid or expired code. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -39,120 +55,132 @@ export default function LoginPage() {
           <div className="inline-flex items-center justify-center h-16 w-16 rounded-2xl bg-indigo-600 mb-4 shadow-lg">
             <FolderKanban className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-foreground mb-2">
-            Project Tracker
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            Sign in to access your workspace
-          </p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Project Tracker</h1>
+          <p className="text-sm text-muted-foreground">Sign in to access your workspace</p>
         </div>
 
-        {/* Login form */}
         <div className="bg-white rounded-2xl shadow-xl border border-border p-8">
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label
-                htmlFor="email"
-                className="block text-sm font-medium text-foreground mb-2"
-              >
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => {
-                  setEmail(e.target.value);
-                  setError("");
-                }}
-                placeholder="Enter your email"
-                disabled={isLoading}
-                autoFocus
-                required
-                className="w-full px-4 py-3 rounded-lg border border-border bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 transition-all"
-              />
-            </div>
-
-            <div>
-              <label
-                htmlFor="password"
-                className="block text-sm font-medium text-foreground mb-2"
-              >
-                Password
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => {
-                  setPassword(e.target.value);
-                  setError("");
-                }}
-                placeholder="Enter your password"
-                disabled={isLoading}
-                required
-                className="w-full px-4 py-3 rounded-lg border border-border bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 transition-all"
-              />
-            </div>
-
-            {error && (
-              <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
-                <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
-                <p className="text-sm text-red-700">{error}</p>
+          {step === "email" ? (
+            <form onSubmit={handleRequestOTP} className="space-y-5">
+              <div>
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
+                  Email
+                </label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => {
+                    setEmail(e.target.value);
+                    setError("");
+                  }}
+                  placeholder="Enter your email"
+                  disabled={isLoading}
+                  autoFocus
+                  required
+                  className="w-full px-4 py-3 rounded-lg border border-border bg-white text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 transition-all"
+                />
               </div>
-            )}
 
-            <button
-              type="submit"
-              disabled={isLoading || !email || !password}
-              className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
-            >
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in...
-                </>
-              ) : (
-                "Sign in"
+              {error && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
+                  <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
               )}
-            </button>
-          </form>
-        </div>
 
-        {/* Dev credentials */}
-        <div className="mt-6 p-4 bg-white/50 rounded-lg border border-border/50">
-          <p className="text-xs font-semibold text-foreground mb-2">
-            Dev Credentials — password:{" "}
-            <span className="font-mono bg-slate-100 px-1.5 py-0.5 rounded">
-              devPassword123!
-            </span>
-          </p>
-          <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
-            {[
-              { e: "arya.pradana@elux.space", role: "Admin" },
-              { e: "lintang@elux.space", role: "Manager" },
-              { e: "dewi@elux.space", role: "Manager" },
-              { e: "ahrasya@elux.space", role: "Manager" },
-              { e: "vira@elux.space", role: "Member" },
-              { e: "aurelia@elux.space", role: "Member" },
-            ].map(({ e, role }) => (
               <button
-                key={e}
+                type="submit"
+                disabled={isLoading || !email.trim()}
+                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Sending code...
+                  </>
+                ) : (
+                  <>
+                    <Mail className="h-4 w-4" />
+                    Send sign-in code
+                  </>
+                )}
+              </button>
+            </form>
+          ) : (
+            <form onSubmit={handleVerifyOTP} className="space-y-5">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  We sent a 6-digit code to{" "}
+                  <strong className="text-foreground">{email}</strong>
+                </p>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="code"
+                  className="block text-sm font-medium text-foreground mb-2"
+                >
+                  Sign-in code
+                </label>
+                <input
+                  id="code"
+                  type="text"
+                  inputMode="numeric"
+                  pattern="[0-9]*"
+                  maxLength={6}
+                  value={code}
+                  onChange={(e) => {
+                    setCode(e.target.value.replace(/\D/g, ""));
+                    setError("");
+                  }}
+                  placeholder="000000"
+                  disabled={isLoading}
+                  autoFocus
+                  required
+                  className="w-full px-4 py-3 rounded-lg border border-border bg-white text-foreground text-center text-2xl tracking-widest font-mono placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:opacity-50 transition-all"
+                />
+              </div>
+
+              {error && (
+                <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
+                  <AlertCircle className="h-4 w-4 text-red-600 shrink-0" />
+                  <p className="text-sm text-red-700">{error}</p>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={isLoading || code.length !== 6}
+                className="w-full bg-indigo-600 text-white py-3 px-4 rounded-lg font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Verifying...
+                  </>
+                ) : (
+                  "Sign in"
+                )}
+              </button>
+
+              <button
                 type="button"
                 onClick={() => {
-                  setEmail(e);
-                  setPassword("devPassword123!");
+                  setStep("email");
+                  setCode("");
                   setError("");
                 }}
-                className="text-left hover:text-indigo-600 transition-colors"
+                className="w-full flex items-center justify-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
               >
-                <span className="font-mono bg-slate-100 px-1 rounded">
-                  {e.split("@")[0]}
-                </span>
-                <span className="ml-1 text-slate-400">({role})</span>
+                <ArrowLeft className="h-4 w-4" />
+                Use a different email
               </button>
-            ))}
-          </div>
+            </form>
+          )}
         </div>
       </div>
     </div>

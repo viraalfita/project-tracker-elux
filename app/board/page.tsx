@@ -1,5 +1,14 @@
 "use client";
 
+import { KanbanColumn } from "@/components/board/KanbanColumn";
+import { TaskCard } from "@/components/board/TaskCard";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { EmptyState } from "@/components/shared/EmptyState";
+import { useAuth } from "@/contexts/AuthContext";
+import { useDataStore } from "@/contexts/DataStore";
+import { isUserInvolvedInEpic } from "@/lib/permissions";
+import { TaskStatus } from "@/lib/types";
+import { isTaskOverdue } from "@/lib/utils";
 import {
   DndContext,
   DragEndEvent,
@@ -10,21 +19,28 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { arrayMove } from "@dnd-kit/sortable";
-import { KanbanColumn } from "@/components/board/KanbanColumn";
-import { TaskCard } from "@/components/board/TaskCard";
-import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
-import { EmptyState } from "@/components/shared/EmptyState";
-import { useAuth } from "@/contexts/AuthContext";
-import { useDataStore } from "@/contexts/DataStore";
-import { isUserInvolvedInEpic } from "@/lib/permissions";
-import { TaskStatus } from "@/lib/types";
-import { ArrowUpDown, ChevronDown, Filter, Kanban, LayoutGrid, Users, X } from "lucide-react";
+import {
+  ArrowUpDown,
+  ChevronDown,
+  Filter,
+  Kanban,
+  LayoutGrid,
+  Users,
+  X,
+} from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 const COLUMNS: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 const ALL_STATUSES: TaskStatus[] = ["To Do", "In Progress", "Review", "Done"];
 
-type SortBy = "" | "due-date-asc" | "due-date-desc" | "priority-high" | "priority-low" | "assignee" | "created-desc";
+type SortBy =
+  | ""
+  | "due-date-asc"
+  | "due-date-desc"
+  | "priority-high"
+  | "priority-low"
+  | "assignee"
+  | "created-desc";
 
 const PRIORITY_ORDER: Record<string, number> = { High: 0, Medium: 1, Low: 2 };
 
@@ -53,7 +69,8 @@ export default function BoardPage() {
   // ── Drag state ─────────────────────────────────────────────────────────────
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const activeTask = useMemo(
-    () => (activeTaskId ? tasks.find((t) => t.id === activeTaskId) ?? null : null),
+    () =>
+      activeTaskId ? (tasks.find((t) => t.id === activeTaskId) ?? null) : null,
     [activeTaskId, tasks],
   );
 
@@ -166,6 +183,7 @@ export default function BoardPage() {
 
   const filteredTasks = useMemo(() => {
     const NOW = new Date();
+    NOW.setHours(0, 0, 0, 0);
     // Non-admin users only see tasks from epics they're involved in
     let result =
       currentUser?.role !== "Admin"
@@ -186,10 +204,7 @@ export default function BoardPage() {
     }
 
     if (dueDateFilter === "overdue") {
-      result = result.filter((t) => {
-        const due = new Date(t.dueDate);
-        return due < NOW && t.status !== "Done";
-      });
+      result = result.filter((t) => isTaskOverdue(t.dueDate, t.status));
     } else if (dueDateFilter === "this-week") {
       const { start, end } = getWeekEnd();
       result = result.filter((t) => {
@@ -437,41 +452,62 @@ export default function BoardPage() {
             />
           </div>
         ) : (
-        <DndContext
-          sensors={sensors}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid grid-cols-4 gap-3 flex-1 min-h-0 pb-4">
-            {COLUMNS.map((status) => (
-              <KanbanColumn
-                key={status}
-                status={status}
-                tasks={filteredTasks.filter((t) => t.status === status).sort((a, b) => {
-                  if (!sortBy) return (a.order ?? 0) - (b.order ?? 0);
-                  switch (sortBy) {
-                    case "due-date-asc": return (a.dueDate || "9999") < (b.dueDate || "9999") ? -1 : 1;
-                    case "due-date-desc": return (a.dueDate || "0000") > (b.dueDate || "0000") ? -1 : 1;
-                    case "priority-high": return (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);
-                    case "priority-low": return (PRIORITY_ORDER[b.priority] ?? 1) - (PRIORITY_ORDER[a.priority] ?? 1);
-                    case "assignee": return (a.assignee?.name ?? "zzz").localeCompare(b.assignee?.name ?? "zzz");
-                    case "created-desc": return 0; // tasks don't carry createdAt yet; falls back to order
-                    default: return (a.order ?? 0) - (b.order ?? 0);
-                  }
-                })}
-                canDragDrop={canDragDrop}
-              />
-            ))}
-          </div>
+          <DndContext
+            sensors={sensors}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+          >
+            <div className="grid grid-cols-4 gap-3 flex-1 min-h-0 pb-4">
+              {COLUMNS.map((status) => (
+                <KanbanColumn
+                  key={status}
+                  status={status}
+                  tasks={filteredTasks
+                    .filter((t) => t.status === status)
+                    .sort((a, b) => {
+                      if (!sortBy) return (a.order ?? 0) - (b.order ?? 0);
+                      switch (sortBy) {
+                        case "due-date-asc":
+                          return (a.dueDate || "9999") < (b.dueDate || "9999")
+                            ? -1
+                            : 1;
+                        case "due-date-desc":
+                          return (a.dueDate || "0000") > (b.dueDate || "0000")
+                            ? -1
+                            : 1;
+                        case "priority-high":
+                          return (
+                            (PRIORITY_ORDER[a.priority] ?? 1) -
+                            (PRIORITY_ORDER[b.priority] ?? 1)
+                          );
+                        case "priority-low":
+                          return (
+                            (PRIORITY_ORDER[b.priority] ?? 1) -
+                            (PRIORITY_ORDER[a.priority] ?? 1)
+                          );
+                        case "assignee":
+                          return (a.assignee?.name ?? "zzz").localeCompare(
+                            b.assignee?.name ?? "zzz",
+                          );
+                        case "created-desc":
+                          return 0; // tasks don't carry createdAt yet; falls back to order
+                        default:
+                          return (a.order ?? 0) - (b.order ?? 0);
+                      }
+                    })}
+                  canDragDrop={canDragDrop}
+                />
+              ))}
+            </div>
 
-          <DragOverlay>
-            {activeTask ? (
-              <div className="rotate-1 shadow-2xl opacity-95">
-                <TaskCard task={activeTask} canDragDrop={false} />
-              </div>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
+            <DragOverlay>
+              {activeTask ? (
+                <div className="rotate-1 shadow-2xl opacity-95">
+                  <TaskCard task={activeTask} canDragDrop={false} />
+                </div>
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
     </div>

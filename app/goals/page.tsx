@@ -1,32 +1,39 @@
 "use client";
 
-import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { GoalFormDialog } from "@/components/goal/GoalFormDialog";
+import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
+import { ConfirmDialog } from "@/components/shared/ConfirmDialog";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { canManageGoal } from "@/lib/permissions";
 import { Epic, Goal, GoalStatus, Task } from "@/lib/types";
-import { AlertTriangle, CheckCircle2, Plus, Target, Trash2, TrendingUp } from "lucide-react";
+import { getEpicHealth } from "@/lib/utils";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Plus,
+  Target,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
-function epicIsAtRisk(epic: Epic, tasks: Task[]): boolean {
-  const NOW = new Date();
-  const epicTasks = tasks.filter((t) => t.epicId === epic.id);
-  const overdueCount = epicTasks.filter(
-    (t) => !!t.dueDate && new Date(t.dueDate) < NOW && t.status !== "Done"
-  ).length;
-  const atRiskCount = epicTasks.filter(
-    (t) => t.status === "In Progress" && t.priority === "High"
-  ).length;
-  return overdueCount > 0 || atRiskCount > 0;
-}
-
-function deriveGoalStatus(goal: Goal, epics: Epic[], tasks: Task[]): GoalStatus {
+function deriveGoalStatus(
+  goal: Goal,
+  epics: Epic[],
+  tasks: Task[],
+): GoalStatus {
   const linked = epics.filter((e) => goal.linkedEpicIds.includes(e.id));
   if (linked.length === 0) return "On Track";
   if (linked.every((e) => e.status === "Done")) return "Completed";
-  const anyAtRisk = linked.some((epic) => epicIsAtRisk(epic, tasks));
+  const anyAtRisk = linked.some((epic) => {
+    const h = getEpicHealth(
+      epic,
+      tasks.filter((t) => t.epicId === epic.id),
+    );
+    return h === "At Risk" || h === "Delayed";
+  });
   return anyAtRisk ? "At Risk" : "On Track";
 }
 
@@ -46,6 +53,7 @@ export default function GoalsPage() {
   const { goals, epics, tasks, deleteGoal } = useDataStore();
   const { currentUser } = useAuth();
   const [showForm, setShowForm] = useState(false);
+  const [goalToDelete, setGoalToDelete] = useState<Goal | null>(null);
 
   if (!currentUser) return null;
 
@@ -90,10 +98,13 @@ export default function GoalsPage() {
           {goals.length === 0 ? (
             <div className="rounded-lg border border-dashed border-border py-16 text-center">
               <Target className="h-8 w-8 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm font-medium text-foreground mb-1">No goals defined yet</p>
+              <p className="text-sm font-medium text-foreground mb-1">
+                No goals defined yet
+              </p>
               {canManage ? (
                 <p className="text-xs text-muted-foreground">
-                  Click &ldquo;New Goal&rdquo; to create your first strategic goal.
+                  Click &ldquo;New Goal&rdquo; to create your first strategic
+                  goal.
                 </p>
               ) : (
                 <p className="text-xs text-muted-foreground">
@@ -141,11 +152,9 @@ export default function GoalsPage() {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (confirm(`Delete goal "${goal.title}"?`)) {
-                            deleteGoal(goal.id);
-                          }
+                          setGoalToDelete(goal);
                         }}
-                        className="absolute top-3 right-14 hidden group-hover:flex items-center justify-center rounded p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
+                        className="absolute bottom-3 right-5 hidden group-hover:flex items-center justify-center rounded p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
                         title="Delete goal"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
@@ -160,6 +169,18 @@ export default function GoalsPage() {
       </div>
 
       <GoalFormDialog open={showForm} onClose={() => setShowForm(false)} />
+
+      <ConfirmDialog
+        open={!!goalToDelete}
+        title="Delete Goal"
+        description={`Are you sure you want to delete "${goalToDelete?.title}"? This action cannot be undone.`}
+        confirmLabel="Delete"
+        onConfirm={() => {
+          if (goalToDelete) deleteGoal(goalToDelete.id);
+          setGoalToDelete(null);
+        }}
+        onCancel={() => setGoalToDelete(null)}
+      />
     </div>
   );
 }

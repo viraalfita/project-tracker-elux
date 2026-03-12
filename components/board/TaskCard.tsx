@@ -1,12 +1,13 @@
 "use client";
 
-import { useSortable } from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
 import { AvatarChip, UnassignedChip } from "@/components/shared/AvatarChip";
 import { PriorityBadge } from "@/components/shared/PriorityBadge";
 import { useDataStore } from "@/contexts/DataStore";
 import { Task } from "@/lib/types";
-import { AlertTriangle, CalendarDays, Clock } from "lucide-react";
+import { getTaskHealth, isTaskOverdue } from "@/lib/utils";
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+import { AlertTriangle, CalendarDays, Clock, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 interface TaskCardProps {
@@ -18,8 +19,10 @@ export function TaskCard({ task, canDragDrop }: TaskCardProps) {
   const { epics } = useDataStore();
   const epic = epics.find((e) => e.id === task.epicId);
   const now = new Date();
+  now.setHours(0, 0, 0, 0);
   const dueDate = task.dueDate ? new Date(task.dueDate) : null;
-  const isOverdue = dueDate !== null && dueDate < now && task.status !== "Done";
+  const isOverdue = isTaskOverdue(task.dueDate, task.status);
+  const health = getTaskHealth(task);
   const isDueSoon =
     !isOverdue &&
     dueDate !== null &&
@@ -109,6 +112,28 @@ export function TaskCard({ task, canDragDrop }: TaskCardProps) {
         {task.subtasks.length > 0 && (
           <span className="text-xs text-muted-foreground">
             {task.subtasks.filter((s) => s.done).length}/{task.subtasks.length}
+          </span>
+        )}
+      </div>
+
+      {/* Health badge — always shown */}
+      <div className="mt-2 pt-2 border-t border-border">
+        {health === "On Track" && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-green-50 text-green-700 ring-1 ring-green-200">
+            <TrendingUp className="h-3 w-3" />
+            On Track
+          </span>
+        )}
+        {health === "At Risk" && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-orange-100 text-orange-700">
+            <AlertTriangle className="h-3 w-3" />
+            At Risk
+          </span>
+        )}
+        {health === "Delayed" && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.5 rounded bg-red-100 text-red-600">
+            <AlertTriangle className="h-3 w-3" />
+            Delayed
           </span>
         )}
       </div>

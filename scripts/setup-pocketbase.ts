@@ -456,6 +456,7 @@ async function createCollections() {
           values: ["Low", "Medium", "High"],
         },
         { name: "due_date", type: "date" },
+        { name: "start_date", type: "date" },
         { name: "estimate", type: "number" },
         { name: "order", type: "number" },
         {

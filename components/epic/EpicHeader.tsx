@@ -5,8 +5,8 @@ import { ProgressBar } from "@/components/shared/ProgressBar";
 import { StatusBadge } from "@/components/shared/StatusBadge";
 import { WatchersSection } from "@/components/shared/WatchersSection";
 import { useDataStore } from "@/contexts/DataStore";
-import { getTaskProgress } from "@/lib/utils";
 import { Epic } from "@/lib/types";
+import { getTaskProgress } from "@/lib/utils";
 import { CalendarDays, ListChecks } from "lucide-react";
 
 interface EpicHeaderProps {
@@ -18,9 +18,12 @@ export function EpicHeader({ epic }: EpicHeaderProps) {
 
   const tasks = allTasks.filter((t) => t.epicId === epic.id);
   const doneTasks = tasks.filter((t) => t.status === "Done").length;
-  const progress = tasks.length === 0 ? 0 : Math.round(
-    tasks.reduce((sum, t) => sum + getTaskProgress(t), 0) / tasks.length
-  );
+  const progress =
+    tasks.length === 0
+      ? 0
+      : Math.round(
+          tasks.reduce((sum, t) => sum + getTaskProgress(t), 0) / tasks.length,
+        );
 
   return (
     <div className="rounded-lg border border-border bg-white p-6">
@@ -36,26 +39,15 @@ export function EpicHeader({ epic }: EpicHeaderProps) {
 
       <ProgressBar value={progress} className="mb-4" />
 
-      <div className="flex items-start justify-between gap-6 text-sm text-muted-foreground">
-        {/* Left side: Owner and Watchers */}
-        <div className="flex flex-wrap items-start gap-5">
-          <div className="flex flex-col gap-1 min-w-[180px]">
-            <span className="text-xs uppercase tracking-wide font-medium">
-              Owner
-            </span>
-            <AvatarChip user={epic.owner} size="sm" showName />
-          </div>
-
-          <div className="flex flex-col gap-1 min-w-[220px]">
-            <WatchersSection
-              watchers={epic.watchers}
-              epic={epic}
-              onUpdate={updateEpicWatchers.bind(null, epic.id)}
-            />
-          </div>
+      {/* Owner + stats row */}
+      <div className="flex items-start justify-between gap-6 text-sm text-muted-foreground mb-4">
+        <div className="flex flex-col gap-1">
+          <span className="text-xs uppercase tracking-wide font-medium text-foreground">
+            Owner
+          </span>
+          <AvatarChip user={epic.owner} size="sm" showName />
         </div>
 
-        {/* Right side: Task count and Dates */}
         <div className="flex flex-col gap-2 items-end text-right">
           <div className="flex items-center gap-1.5">
             <ListChecks className="h-4 w-4" />
@@ -74,6 +66,13 @@ export function EpicHeader({ epic }: EpicHeaderProps) {
           )}
         </div>
       </div>
+
+      {/* Members section */}
+      <WatchersSection
+        watchers={epic.watchers}
+        epic={epic}
+        onUpdate={updateEpicWatchers.bind(null, epic.id)}
+      />
     </div>
   );
 }

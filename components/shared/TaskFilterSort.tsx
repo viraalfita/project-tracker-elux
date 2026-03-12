@@ -2,6 +2,7 @@
 
 import { useDataStore } from "@/contexts/DataStore";
 import { Priority, Task, TaskStatus } from "@/lib/types";
+import { isTaskOverdue } from "@/lib/utils";
 import { ChevronDown, Filter, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -103,11 +104,7 @@ export function TaskFilterSort({
     }
 
     if (filters.overdue) {
-      const now = new Date();
-      filtered = filtered.filter((t) => {
-        const due = new Date(t.dueDate);
-        return due < now && t.status !== "Done";
-      });
+      filtered = filtered.filter((t) => isTaskOverdue(t.dueDate, t.status));
     }
 
     // Apply sort

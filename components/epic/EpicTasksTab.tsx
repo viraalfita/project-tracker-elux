@@ -9,9 +9,18 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
 import { useToast } from "@/contexts/ToastContext";
 import { canCreate, canDelete, canEdit } from "@/lib/permissions";
-import { getTaskProgress } from "@/lib/utils";
 import { Epic, Task } from "@/lib/types";
-import { CalendarDays, ChevronRight, Pencil, Plus, Trash2 } from "lucide-react";
+import { getTaskHealth, getTaskProgress } from "@/lib/utils";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Pencil,
+  Plus,
+  Trash2,
+  TrendingUp,
+} from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -21,11 +30,7 @@ interface EpicTasksTabProps {
   epic: Epic;
 }
 
-export function EpicTasksTab({
-  tasks,
-  epicId,
-  epic,
-}: EpicTasksTabProps) {
+export function EpicTasksTab({ tasks, epicId, epic }: EpicTasksTabProps) {
   const { deleteTask } = useDataStore();
   const { toast } = useToast();
   const { currentUser } = useAuth();
@@ -83,6 +88,37 @@ export function EpicTasksTab({
                         <span className="text-sm font-medium text-foreground group-hover:text-indigo-700 transition-colors truncate">
                           {task.title}
                         </span>
+                        {(() => {
+                          const h = getTaskHealth(task);
+                          if (h === "On Track")
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200 shrink-0">
+                                <TrendingUp className="h-3 w-3" />
+                                On Track
+                              </span>
+                            );
+                          if (h === "At Risk")
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 px-2 py-0.5 text-xs font-medium text-orange-700 ring-1 ring-orange-200 shrink-0">
+                                <AlertTriangle className="h-3 w-3" />
+                                At Risk
+                              </span>
+                            );
+                          if (h === "Delayed")
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700 ring-1 ring-red-200 shrink-0">
+                                <AlertTriangle className="h-3 w-3" />
+                                Delayed
+                              </span>
+                            );
+                          if (h === "Completed")
+                            return (
+                              <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700 ring-1 ring-green-200 shrink-0">
+                                <CheckCircle2 className="h-3 w-3" />
+                                Completed
+                              </span>
+                            );
+                        })()}
                         {!task.assignee && (
                           <span className="text-xs text-red-500 font-medium">
                             Unassigned
@@ -98,10 +134,16 @@ export function EpicTasksTab({
                             {progress}%
                           </span>
                         )}
+                        {task.startDate && (
+                          <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                            <CalendarDays className="h-3.5 w-3.5" />
+                            Start: {task.startDate}
+                          </span>
+                        )}
                         {task.dueDate && (
                           <span className="flex items-center gap-1 text-xs text-muted-foreground">
                             <CalendarDays className="h-3.5 w-3.5" />
-                            {task.dueDate}
+                            Due: {task.dueDate}
                           </span>
                         )}
                       </div>

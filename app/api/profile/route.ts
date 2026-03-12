@@ -61,7 +61,14 @@ export async function PATCH(request: NextRequest) {
     const pb = await getSuperuserClient();
     const record = await pb.collection("users").update(userId, {
       name: String(name).trim(),
-      initials: initials ? String(initials).trim() : String(name).trim().split(" ").map((w: string) => w[0]?.toUpperCase() ?? "").slice(0, 2).join(""),
+      initials: initials
+        ? String(initials).trim()
+        : String(name)
+            .trim()
+            .split(" ")
+            .map((w: string) => w[0]?.toUpperCase() ?? "")
+            .slice(0, 2)
+            .join(""),
       ...(avatarColor ? { avatarColor: String(avatarColor) } : {}),
     });
     return NextResponse.json(record);

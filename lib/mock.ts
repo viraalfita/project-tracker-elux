@@ -334,7 +334,9 @@ export function getEpicHealthIndicators(epicId: string): {
   }).length;
 
   const atRiskCount = epicTasks.filter((t) => {
-    return t.status === "In Progress" && t.priority === "High";
+    const due = new Date(t.dueDate);
+    const now = new Date("2026-02-10");
+    return due < now && t.status !== "Done";
   }).length;
 
   return { overdueCount, atRiskCount };

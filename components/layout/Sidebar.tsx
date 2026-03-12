@@ -123,25 +123,31 @@ export function Sidebar() {
         {/* User + logout */}
         <div className="border-t border-border px-3 py-3">
           <div className="flex items-center gap-2">
-            <span
-              className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white shrink-0"
-              style={{ backgroundColor: currentUser.avatarColor }}
+            <Link
+              href="/profile"
+              title="View profile"
+              className="flex items-center gap-2 min-w-0 flex-1 rounded-md hover:bg-accent transition-colors -mx-1 px-1 py-0.5"
             >
-              {currentUser.initials}
-            </span>
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-medium text-foreground truncate">
-                {currentUser.name}
-              </p>
               <span
-                className={cn(
-                  "inline-block rounded-full px-1.5 py-0 text-xs font-medium leading-5",
-                  ROLE_BADGE[currentUser.role],
-                )}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold text-white shrink-0"
+                style={{ backgroundColor: currentUser.avatarColor }}
               >
-                {currentUser.role}
+                {currentUser.initials}
               </span>
-            </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-medium text-foreground truncate">
+                  {currentUser.name}
+                </p>
+                <span
+                  className={cn(
+                    "inline-block rounded-full px-1.5 py-0 text-xs font-medium leading-5",
+                    ROLE_BADGE[currentUser.role],
+                  )}
+                >
+                  {currentUser.role}
+                </span>
+              </div>
+            </Link>
             <NotificationPanel />
             <button
               onClick={logout}
