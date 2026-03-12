@@ -391,7 +391,7 @@ export default function ProfilePage() {
                     No backup codes configured
                   </p>
                   <p className="text-xs text-amber-700">
-                    You won't be able to sign in if email OTP is unavailable.
+                    You won&apos;t be able to sign in if email OTP is unavailable.
                   </p>
                 </div>
               </div>

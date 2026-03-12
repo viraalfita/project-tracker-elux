@@ -177,7 +177,7 @@ export function BackupCodesModal({
                     </p>
                     <p>
                       Each code can be used <strong>once</strong> to sign in
-                      when you can't receive email. We will never show them
+                      when you can&apos;t receive email. We will never show them
                       again.
                     </p>
                   </div>
