@@ -19,7 +19,6 @@ COPY --from=builder /app/.next ./.next
 # Runtime env vars (PB_ADMIN_EMAIL, PB_ADMIN_PASSWORD, SMTP_*, etc.)
 # .env.local is not included in the builder's COPY; pass secrets via
 # docker run --env-file .env.local  OR  set them in your compose / host.
-COPY .env.local .env.local
 
 EXPOSE 3000
 
