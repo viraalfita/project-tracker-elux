@@ -1,5 +1,6 @@
 "use client";
 
+import { BackupCodesModal } from "@/components/shared/BackupCodesModal";
 import { useAuth } from "@/contexts/AuthContext";
 import { pb } from "@/lib/pocketbase";
 import {
@@ -7,10 +8,13 @@ import {
   CheckCircle2,
   ChevronDown,
   ChevronUp,
+  KeyRound,
   Loader2,
   Mail,
+  RefreshCw,
   ShieldCheck,
 } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 
 function deriveInitials(name: string): string {
@@ -33,6 +37,7 @@ function formatDate(dateStr: string | undefined): string {
 
 export default function ProfilePage() {
   const { currentUser, isLoading } = useAuth();
+  const searchParams = useSearchParams();
 
   // Name form state
   const [name, setName] = useState("");
@@ -47,10 +52,41 @@ export default function ProfilePage() {
   const [emailSending, setEmailSending] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
 
+  // Backup codes state
+  const [backupStatus, setBackupStatus] = useState<{
+    total: number;
+    remaining: number;
+    hasActive: boolean;
+  } | null>(null);
+  const [backupStatusLoading, setBackupStatusLoading] = useState(false);
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const codesExhausted = searchParams.get("backupCodesExhausted") === "1";
+
+  async function fetchBackupStatus() {
+    setBackupStatusLoading(true);
+    try {
+      const res = await fetch("/api/backup-codes", {
+        headers: { Authorization: `Bearer ${pb.authStore.token}` },
+      });
+      const data = await res.json();
+      setBackupStatus(data);
+    } catch {
+      // silent — non-critical
+    } finally {
+      setBackupStatusLoading(false);
+    }
+  }
+
   // Sync name field when currentUser loads or changes
   useEffect(() => {
     if (currentUser?.name) setName(currentUser.name);
   }, [currentUser?.name]);
+
+  // Load backup code status once user is ready
+  useEffect(() => {
+    if (currentUser) fetchBackupStatus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentUser?.id]);
 
   if (isLoading) {
     return (
@@ -301,6 +337,119 @@ export default function ProfilePage() {
           </form>
         )}
       </div>
+
+      {/* Backup codes management */}
+      <div className="bg-white border border-border rounded-xl p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <KeyRound className="h-4 w-4 text-indigo-600 shrink-0" />
+            <h2 className="text-sm font-semibold text-foreground">
+              Backup codes
+            </h2>
+          </div>
+          {backupStatus && (
+            <button
+              type="button"
+              onClick={() => setShowRegenerateModal(true)}
+              className="flex items-center gap-1.5 text-xs text-indigo-600 hover:text-indigo-700 font-medium transition-colors"
+            >
+              <RefreshCw className="h-3.5 w-3.5" />
+              Regenerate
+            </button>
+          )}
+        </div>
+
+        {codesExhausted && (
+          <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
+            <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+            <p className="text-xs text-red-700">
+              All your backup codes have been used. Generate a new set below so
+              you have a fallback for future logins.
+            </p>
+          </div>
+        )}
+
+        {backupStatusLoading && (
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+            Checking status…
+          </div>
+        )}
+
+        {!backupStatusLoading && backupStatus !== null && (
+          <>
+            <p className="text-xs text-muted-foreground">
+              One-time fallback codes for when email delivery is unavailable.
+              Each code can be used only once. Store them somewhere safe.
+            </p>
+
+            {backupStatus.total === 0 ? (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <p className="text-xs font-medium text-amber-800">
+                    No backup codes configured
+                  </p>
+                  <p className="text-xs text-amber-700">
+                    You won't be able to sign in if email OTP is unavailable.
+                  </p>
+                </div>
+              </div>
+            ) : backupStatus.remaining === 0 ? (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-red-50 border border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-red-700">
+                  All {backupStatus.total} codes have been used. Regenerate a
+                  new set now.
+                </p>
+              </div>
+            ) : backupStatus.remaining <= 3 ? (
+              <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-50 border border-amber-200">
+                <AlertCircle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-800">
+                  <strong>{backupStatus.remaining}</strong> of{" "}
+                  {backupStatus.total} codes remaining — consider regenerating
+                  soon.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200">
+                <CheckCircle2 className="h-4 w-4 text-green-600 shrink-0" />
+                <p className="text-xs text-green-800">
+                  <strong>{backupStatus.remaining}</strong> of{" "}
+                  {backupStatus.total} codes remaining
+                </p>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={() => setShowRegenerateModal(true)}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg border border-border text-sm font-medium text-foreground hover:bg-slate-50 transition-colors"
+            >
+              <RefreshCw className="h-4 w-4" />
+              {backupStatus.total === 0
+                ? "Set up backup codes"
+                : "Regenerate backup codes"}
+            </button>
+            {backupStatus.total > 0 && (
+              <p className="text-xs text-muted-foreground">
+                Regenerating will permanently invalidate all existing codes.
+              </p>
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Regenerate backup codes modal */}
+      <BackupCodesModal
+        open={showRegenerateModal}
+        onClose={() => {
+          setShowRegenerateModal(false);
+          fetchBackupStatus();
+        }}
+        isFirstTime={false}
+      />
 
       {/* Read-only: Account details */}
       <div className="bg-white border border-border rounded-xl p-6 space-y-4">

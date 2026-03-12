@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "pb:setup": "tsx scripts/setup-pocketbase.ts",
+    "pb:backup-codes": "tsx scripts/setup-backup-codes.ts",
     "pb:email-templates": "tsx scripts/setup-pb-email-templates.ts"
   },
   "dependencies": {

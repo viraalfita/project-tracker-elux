@@ -24,15 +24,25 @@ interface AuthContextType {
   /**
    * Step 1 of OTP login: sends a 6-digit code to the user's email.
    * Returns the otpId needed for step 2.
-   * @disabled OTP auth is currently disabled in the UI — kept for future use.
    */
   requestOTP: (email: string) => Promise<string>;
   /**
    * Step 2 of OTP login: verifies the code and authenticates the user.
    * Returns isFirstLogin=true when the user still has the invite placeholder name.
-   * @disabled OTP auth is currently disabled in the UI — kept for future use.
    */
-  verifyOTP: (otpId: string, code: string) => Promise<{ isFirstLogin: boolean }>;
+  verifyOTP: (
+    otpId: string,
+    code: string,
+  ) => Promise<{ isFirstLogin: boolean }>;
+  /**
+   * Fallback login via a one-time backup code.
+   * Calls POST /api/auth/backup-code (server-side hashed validation).
+   * Returns the number of remaining unused codes so the UI can warn the user.
+   */
+  loginWithBackupCode: (
+    email: string,
+    code: string,
+  ) => Promise<{ remaining: number }>;
   logout: () => void;
 }
 
@@ -42,6 +52,7 @@ const AuthContext = createContext<AuthContextType>({
   login: async () => {},
   requestOTP: async () => "",
   verifyOTP: async () => ({ isFirstLogin: false }),
+  loginWithBackupCode: async () => ({ remaining: 0 }),
   logout: () => {},
 });
 
@@ -94,8 +105,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const authData = await pb.collection("users").authWithOTP(otpId, code);
       const user = mapUser(authData.record as unknown as PBUser);
       setCurrentUser(user);
-      const isFirstLogin = user.name === INVITED_PLACEHOLDER || !user.name.trim();
+      const isFirstLogin =
+        user.name === INVITED_PLACEHOLDER || !user.name.trim();
       return { isFirstLogin };
+    },
+    [],
+  );
+
+  /**
+   * Authenticate with a one-time backup code.
+   * Validation is entirely server-side — raw code never leaves this function
+   * unvalidated. On success the PocketBase authStore is populated so the rest
+   * of the app sees an authenticated session immediately.
+   */
+  const loginWithBackupCode = useCallback(
+    async (email: string, code: string): Promise<{ remaining: number }> => {
+      const res = await fetch("/api/auth/backup-code", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error ?? "Invalid email or backup code.");
+      }
+      // Hydrate PocketBase authStore with the server-issued token
+      pb.authStore.save(data.token, data.record);
+      setCurrentUser(mapUser(data.record as unknown as PBUser));
+      return { remaining: data.remaining ?? 0 };
     },
     [],
   );
@@ -106,7 +143,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ currentUser, isLoading, login, requestOTP, verifyOTP, logout }}>
+    <AuthContext.Provider
+      value={{
+        currentUser,
+        isLoading,
+        login,
+        requestOTP,
+        verifyOTP,
+        loginWithBackupCode,
+        logout,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

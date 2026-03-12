@@ -14,7 +14,7 @@ import PocketBase, { ClientResponseError } from "pocketbase";
 dotenv.config({ path: ".env.local" });
 
 const PB_URL =
-  process.env.NEXT_PUBLIC_POCKETBASE_URL ?? "https://pb.eluxemang.top";
+  process.env.NEXT_PUBLIC_POCKETBASE_URL ?? "https://devpb.eluxemang.top";
 const ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL ?? "";
 const ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD ?? "";
 
