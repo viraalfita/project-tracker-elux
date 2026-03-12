@@ -20,6 +20,11 @@ const BACKUP_CODES_COUNT = 10;
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function getSuperuserClient(): Promise<PocketBase> {
+  if (!PB_ADMIN_EMAIL || !PB_ADMIN_PASSWORD) {
+    throw new Error(
+      "PB_ADMIN_EMAIL / PB_ADMIN_PASSWORD env vars are not set on the server.",
+    );
+  }
   const pb = new PocketBase(PB_URL);
   pb.autoCancellation(false);
   await pb
@@ -151,9 +156,10 @@ export async function POST(request: NextRequest) {
     // Return plain codes — displayed once; never retrievable again
     return NextResponse.json({ codes: plainCodes });
   } catch (err: unknown) {
-    console.error("[backup-codes POST]", err);
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error("[backup-codes POST]", msg);
     return NextResponse.json(
-      { error: "Failed to generate backup codes. Please try again." },
+      { error: `Failed to generate backup codes: ${msg}` },
       { status: 500 },
     );
   }
