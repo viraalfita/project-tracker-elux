@@ -40,7 +40,9 @@ async function verifyAdminOrManagerToken(token: string): Promise<boolean> {
     const pb = new PocketBase(PB_URL);
     pb.autoCancellation(false);
     pb.authStore.save(token, null);
-    const result = await pb.collection("users").authRefresh<{ role?: string }>();
+    const result = await pb
+      .collection("users")
+      .authRefresh<{ role?: string }>();
     return result.record?.role === "Admin" || result.record?.role === "Manager";
   } catch {
     return false;
@@ -52,7 +54,10 @@ function extractToken(req: NextRequest): string {
 }
 
 function forbidden() {
-  return NextResponse.json({ error: "Forbidden: Admin or Manager access required." }, { status: 403 });
+  return NextResponse.json(
+    { error: "Forbidden: Admin or Manager access required." },
+    { status: 403 },
+  );
 }
 
 // ── GET /api/admin/invites ──────────────────────────────────────────────────
@@ -70,9 +75,7 @@ export async function GET(request: NextRequest) {
     const invites = await pb
       .collection("invites")
       .getFullList({ sort: "-created", expand: "invited_by" })
-      .catch(() =>
-        pb.collection("invites").getFullList({ sort: "-created" })
-      )
+      .catch(() => pb.collection("invites").getFullList({ sort: "-created" }))
       .catch(() => []);
 
     return NextResponse.json(invites);
@@ -101,10 +104,17 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => ({}));
-  const { name, email, role } = body as { name?: string; email?: string; role?: string };
+  const { name, email, role } = body as {
+    name?: string;
+    email?: string;
+    role?: string;
+  };
 
   if (!name?.trim() || !email || !role) {
-    return NextResponse.json({ error: "name, email, and role are required." }, { status: 400 });
+    return NextResponse.json(
+      { error: "name, email, and role are required." },
+      { status: 400 },
+    );
   }
 
   const validRoles = ["Admin", "Manager", "Member", "Viewer"];
@@ -141,10 +151,17 @@ export async function POST(request: NextRequest) {
   }
 
   const AVATAR_COLORS = [
-    "#6366f1", "#8b5cf6", "#ec4899", "#14b8a6",
-    "#f59e0b", "#10b981", "#3b82f6", "#ef4444",
+    "#6366f1",
+    "#8b5cf6",
+    "#ec4899",
+    "#14b8a6",
+    "#f59e0b",
+    "#10b981",
+    "#3b82f6",
+    "#ef4444",
   ];
-  const avatarColor = AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
+  const avatarColor =
+    AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
   const initials = deriveInitials(name.trim());
 
   // Generate a random password — user authenticates via OTP only, never via password.
@@ -175,7 +192,9 @@ export async function POST(request: NextRequest) {
   }
 
   // Create the invite record
-  const expiresAt = new Date(Date.now() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000)
+  const expiresAt = new Date(
+    Date.now() + INVITE_EXPIRY_DAYS * 24 * 60 * 60 * 1000,
+  )
     .toISOString()
     .replace("T", " ");
 
@@ -192,7 +211,10 @@ export async function POST(request: NextRequest) {
     inviteId = invite.id;
   } catch (err: unknown) {
     // Roll back user creation if invite record fails
-    await pb.collection("users").delete(userId).catch(() => {});
+    await pb
+      .collection("users")
+      .delete(userId)
+      .catch(() => {});
     const msg = err instanceof Error ? err.message : "Failed to create invite";
     return NextResponse.json({ error: msg }, { status: 400 });
   }

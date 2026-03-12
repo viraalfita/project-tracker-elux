@@ -39,7 +39,11 @@ async function main() {
     collection = await pb.send("/api/collections/tasks", { method: "GET" });
   } catch (err) {
     if (err instanceof ClientResponseError) {
-      console.error("Failed to fetch tasks collection:", err.status, err.message);
+      console.error(
+        "Failed to fetch tasks collection:",
+        err.status,
+        err.message,
+      );
     } else {
       console.error("Failed to fetch tasks collection:", err);
     }
@@ -104,9 +108,7 @@ async function main() {
   }
 
   for (const [, group] of Object.entries(byStatus)) {
-    group.sort((a, b) =>
-      String(a.created) < String(b.created) ? -1 : 1,
-    );
+    group.sort((a, b) => (String(a.created) < String(b.created) ? -1 : 1));
     for (let i = 0; i < group.length; i++) {
       await pb
         .collection("tasks")

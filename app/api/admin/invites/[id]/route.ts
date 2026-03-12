@@ -27,7 +27,9 @@ async function verifyAdminOrManagerToken(token: string): Promise<boolean> {
     const pb = new PocketBase(PB_URL);
     pb.autoCancellation(false);
     pb.authStore.save(token, null);
-    const result = await pb.collection("users").authRefresh<{ role?: string }>();
+    const result = await pb
+      .collection("users")
+      .authRefresh<{ role?: string }>();
     return result.record?.role === "Admin" || result.record?.role === "Manager";
   } catch {
     return false;
@@ -44,7 +46,10 @@ export async function DELETE(
 ) {
   const token = extractToken(request);
   if (!token || !(await verifyAdminOrManagerToken(token))) {
-    return NextResponse.json({ error: "Forbidden: Admin or Manager access required." }, { status: 403 });
+    return NextResponse.json(
+      { error: "Forbidden: Admin or Manager access required." },
+      { status: 403 },
+    );
   }
 
   const { id } = await params;
@@ -53,7 +58,10 @@ export async function DELETE(
   // Fetch the invite
   let invite: Record<string, unknown>;
   try {
-    invite = await pb.collection("invites").getOne(id) as Record<string, unknown>;
+    invite = (await pb.collection("invites").getOne(id)) as Record<
+      string,
+      unknown
+    >;
   } catch {
     return NextResponse.json({ error: "Invite not found." }, { status: 404 });
   }
@@ -70,9 +78,12 @@ export async function DELETE(
   // has not yet logged in, so it is safe to remove the pre-created record.
   const linkedUserId = invite.user as string | undefined;
   if (linkedUserId) {
-    await pb.collection("users").delete(linkedUserId).catch(() => {
-      // Non-fatal — user may have already been deleted or logged in independently
-    });
+    await pb
+      .collection("users")
+      .delete(linkedUserId)
+      .catch(() => {
+        // Non-fatal — user may have already been deleted or logged in independently
+      });
   }
 
   return NextResponse.json({ success: true });
