@@ -3,6 +3,7 @@
 import { Breadcrumbs } from "@/components/layout/Breadcrumbs";
 import { useAuth } from "@/contexts/AuthContext";
 import { useDataStore } from "@/contexts/DataStore";
+import { pb } from "@/lib/pocketbase";
 import {
   calculateTeamWorkload,
   downloadKpiCsv,
@@ -18,22 +19,41 @@ import {
   Clock,
   Download,
   Filter,
+  KeyRound,
   LayoutDashboard,
   TrendingUp,
   Users as UsersIcon,
+  X,
 } from "lucide-react";
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 export default function DashboardPage() {
   const { epics, tasks, users } = useDataStore();
   const { currentUser } = useAuth();
 
-  // ── Epic KPI filter ────────────────────────────────────────────────────────
+  // -- Epic KPI filter --------------------------------------------------------
   const [kpiEpicFilter, setKpiEpicFilter] = useState("");
 
   const NOW = new Date();
   NOW.setHours(0, 0, 0, 0);
+
+  // -- Backup codes warning ---------------------------------------------------
+  const [showBackupWarning, setShowBackupWarning] = useState(false);
+
+  useEffect(() => {
+    if (!currentUser) return;
+    fetch("/api/backup-codes", {
+      headers: { Authorization: `Bearer ${pb.authStore.token}` },
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.hasActive) setShowBackupWarning(true);
+      })
+      .catch(() => {
+        /* non-fatal */
+      });
+  }, [currentUser?.id]);
   const isManager = currentUser?.role === "Manager";
   const isManagementView =
     currentUser?.role === "Admin" || currentUser?.role === "Manager";
@@ -123,11 +143,41 @@ export default function DashboardPage() {
         <Breadcrumbs items={[{ label: "Dashboard" }]} />
       </div>
 
+      {/* Backup codes warning banner */}
+      {showBackupWarning && (
+        <div className="mx-6 mt-4 flex items-start justify-between gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <KeyRound className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+            <div className="text-sm text-amber-800">
+              <span className="font-semibold">Set up backup codes</span>
+              {" \u2014 "}
+              You don&apos;t have any backup codes yet. If email delivery is
+              down, you&apos;ll be locked out.{" "}
+              <Link
+                href="/profile"
+                className="underline font-medium hover:text-amber-900"
+              >
+                Go to Profile to generate them
+              </Link>
+              .
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowBackupWarning(false)}
+            className="shrink-0 text-amber-500 hover:text-amber-700 transition-colors"
+            aria-label="Dismiss"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="flex-1 px-6 py-6 space-y-6 overflow-auto">
         {currentUser && isManagementView ? (
-          // ═══════════════════════════════════════════════════════════════════
+          // ===================================================================
           // MONITORING DASHBOARD (Admin / Manager)
-          // ═══════════════════════════════════════════════════════════════════
+          // ===================================================================
           <>
             {/* Page heading */}
             <div className="flex items-center gap-3">
@@ -137,13 +187,13 @@ export default function DashboardPage() {
                   Management Dashboard
                 </h1>
                 <p className="text-sm text-muted-foreground">
-                  Monitoring &amp; oversight — track health, workload, and key
+                  Monitoring &amp; oversight -- track health, workload, and key
                   metrics
                 </p>
               </div>
             </div>
 
-            {/* ── KPI Cards with Epic filter ──────────────────────────────── */}
+            {/* -- KPI Cards with Epic filter -------------------------------- */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide">
@@ -235,7 +285,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* ── Early Warning System (compact, max 3 rows) ─────────────── */}
+            {/* -- Early Warning System (compact, max 3 rows) --------------- */}
             <div>
               <div className="flex items-center justify-between mb-2">
                 <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
@@ -251,7 +301,7 @@ export default function DashboardPage() {
                   href="/epics"
                   className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
                 >
-                  View all →
+                  View all &rarr;
                 </Link>
               </div>
 
@@ -290,7 +340,7 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Epic list — max 3, scrollable */}
+                {/* Epic list -- max 3, scrollable */}
                 {epicsAtRisk.length === 0 ? (
                   <div className="flex items-center justify-center gap-2 py-4">
                     <CheckCircle2 className="h-4 w-4 text-green-500" />
@@ -314,7 +364,7 @@ export default function DashboardPage() {
                             </p>
                             <p className="text-xs text-muted-foreground">
                               {overdue > 0 && `${overdue} overdue`}
-                              {overdue > 0 && progress < 30 && " · "}
+                              {overdue > 0 && progress < 30 && " * "}
                               {progress < 30 && `${progress}% progress`}
                             </p>
                           </div>
@@ -335,7 +385,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* ── Resource Utilisation Board ─────────────────────────────── */}
+            {/* -- Resource Utilisation Board ------------------------------- */}
             <div>
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold text-foreground uppercase tracking-wide flex items-center gap-2">
@@ -346,7 +396,7 @@ export default function DashboardPage() {
                   href="/utilization"
                   className="text-xs text-indigo-600 hover:text-indigo-700 font-medium"
                 >
-                  Full report →
+                  Full report &rarr;
                 </Link>
               </div>
 
@@ -469,9 +519,9 @@ export default function DashboardPage() {
             </div>
           </>
         ) : (
-          // ═══════════════════════════════════════════════════════════════════
+          // ===================================================================
           // PERSONAL WORK DASHBOARD (Member / Viewer)
-          // ═══════════════════════════════════════════════════════════════════
+          // ===================================================================
           <>
             {/* Page heading */}
             <div className="flex items-center gap-3">
