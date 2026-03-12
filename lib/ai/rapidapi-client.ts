@@ -4,7 +4,7 @@
  * This module NEVER writes to the database.
  */
 
-const RAPIDAPI_URL = "https://chatgpt-42.p.rapidapi.com/gpt4o";
+const RAPIDAPI_URL = "https://chatgpt-42.p.rapidapi.com/conversationgpt4-2";
 
 /** Generic result returned by all intent parsers */
 export interface LLMParseResult {
@@ -325,7 +325,14 @@ async function callRapidAPI(
       "X-RapidAPI-Host":
         process.env.RAPIDAPI_HOST ?? "chatgpt-42.p.rapidapi.com",
     },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({
+      messages,
+      temperature: 0,
+      top_k: 1,
+      top_p: 0.5,
+      max_tokens: 50,
+      web_access: false,
+    }),
   });
 
   if (!response.ok) {
