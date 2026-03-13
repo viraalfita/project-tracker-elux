@@ -31,9 +31,10 @@ import {
   KpiInput,
 } from "@/lib/ai/executor";
 import {
+  AiProviderRateLimit,
   INTENT_REQUIRED_FIELDS,
+  LLMProviderError,
   parseForIntent,
-  RapidApiCreditRateLimit,
   SUPPORTED_INTENTS,
 } from "@/lib/ai/rapidapi-client";
 import { resolveEntityByTitle, resolveUserByName } from "@/lib/ai/validators";
@@ -423,7 +424,7 @@ export async function POST(request: NextRequest) {
 
   // ── LLM Parse ────────────────────────────────────────────────────────────
   let parsed;
-  let rateLimit: RapidApiCreditRateLimit | null = null;
+  let rateLimit: AiProviderRateLimit | null = null;
   try {
     const parseResult = await parseForIntent(
       selectedIntent,
@@ -435,11 +436,27 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     const msg = err instanceof Error ? err.message : "Unknown LLM error";
     console.error("[AI parse] LLM call failed:", msg);
+
+    if (err instanceof LLMProviderError && err.statusCode === 429) {
+      return NextResponse.json(
+        {
+          reply:
+            "Model AI sedang penuh (rate limit). Coba lagi beberapa detik lagi.",
+          status: "rate_limited",
+          ...(process.env.NODE_ENV !== "production"
+            ? { debug_error: msg, provider: err.provider, model: err.model }
+            : {}),
+        },
+        { status: 429 },
+      );
+    }
+
     return NextResponse.json(
       {
         reply:
           "Maaf, ada masalah saat memproses perintahmu. Coba lagi sebentar lagi.",
         status: "error",
+        ...(process.env.NODE_ENV !== "production" ? { debug_error: msg } : {}),
       },
       { status: 502 },
     );

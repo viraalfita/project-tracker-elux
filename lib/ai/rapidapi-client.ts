@@ -1,10 +1,23 @@
 /**
- * RapidAPI LLM client.
+ * OpenRouter LLM client.
  * Responsibility: ONLY parse user messages into structured JSON.
  * This module NEVER writes to the database.
  */
 
-const RAPIDAPI_URL = "https://chatgpt-42.p.rapidapi.com/conversationgpt4-2";
+const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
+const DEFAULT_OPENROUTER_MODEL = "qwen/qwen3-next-80b-a3b-instruct:free";
+
+export class LLMProviderError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+    public readonly provider: "openrouter" = "openrouter",
+    public readonly model?: string,
+  ) {
+    super(message);
+    this.name = "LLMProviderError";
+  }
+}
 
 /** Generic result returned by all intent parsers */
 export interface LLMParseResult {
@@ -16,14 +29,14 @@ export interface LLMParseResult {
   reply_to_user: string;
 }
 
-export interface RapidApiCreditRateLimit {
+export interface AiProviderRateLimit {
   credit_limit: number | null;
   credit_remaining: number | null;
 }
 
 export interface ParseForIntentResult {
   parsed: LLMParseResult;
-  rateLimit: RapidApiCreditRateLimit | null;
+  rateLimit: AiProviderRateLimit | null;
 }
 
 // ── Per-intent system prompts ────────────────────────────────────────────
@@ -314,55 +327,129 @@ export const SUPPORTED_INTENTS = new Set(Object.keys(INTENT_REQUIRED_FIELDS));
 
 // ── Internal LLM caller ─────────────────────────────────────────────────────────────
 
-async function callRapidAPI(
+async function callOpenRouter(
   messages: Array<{ role: string; content: string }>,
 ): Promise<ParseForIntentResult> {
-  const response = await fetch(RAPIDAPI_URL, {
+  const apiKey = process.env.OPENROUTER_API_KEY ?? "";
+  if (!apiKey) {
+    throw new Error("Missing OPENROUTER_API_KEY");
+  }
+
+  const primaryModel = process.env.OPENROUTER_MODEL ?? DEFAULT_OPENROUTER_MODEL;
+  const fallbackModels = (process.env.OPENROUTER_FALLBACK_MODELS ?? "")
+    .split(",")
+    .map((m) => m.trim())
+    .filter(Boolean);
+
+  const modelsToTry = [primaryModel, ...fallbackModels];
+  let lastError: unknown = null;
+
+  for (const model of modelsToTry) {
+    try {
+      return await requestOpenRouter(messages, apiKey, model);
+    } catch (error) {
+      lastError = error;
+      if (!(error instanceof LLMProviderError)) throw error;
+      if (error.statusCode !== 429) throw error;
+      if (model === modelsToTry[modelsToTry.length - 1]) throw error;
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("OpenRouter call failed");
+}
+
+async function requestOpenRouter(
+  messages: Array<{ role: string; content: string }>,
+  apiKey: string,
+  model: string,
+): Promise<ParseForIntentResult> {
+  const response = await fetch(OPENROUTER_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
-      "X-RapidAPI-Key": process.env.RAPIDAPI_KEY ?? "",
-      "X-RapidAPI-Host":
-        process.env.RAPIDAPI_HOST ?? "chatgpt-42.p.rapidapi.com",
+      Authorization: `Bearer ${apiKey}`,
+      ...(process.env.OPENROUTER_SITE_URL
+        ? { "HTTP-Referer": process.env.OPENROUTER_SITE_URL }
+        : {}),
+      ...(process.env.OPENROUTER_SITE_NAME
+        ? { "X-Title": process.env.OPENROUTER_SITE_NAME }
+        : {}),
     },
     body: JSON.stringify({
+      model,
       messages,
       temperature: 0,
-      top_k: 1,
       top_p: 0.5,
-      max_tokens: 50,
-      web_access: false,
+      max_tokens: 300,
+      response_format: { type: "json_object" },
     }),
   });
 
   if (!response.ok) {
     const text = await response.text().catch(() => "");
-    throw new Error(
-      `RapidAPI responded ${response.status}: ${text.slice(0, 200)}`,
+    throw new LLMProviderError(
+      `OpenRouter responded ${response.status}: ${text.slice(0, 300)}`,
+      response.status,
+      "openrouter",
+      model,
     );
   }
 
   const data = await response.json();
-  const content: string =
-    data?.choices?.[0]?.message?.content ?? data?.result ?? "";
+  const messageContent = data?.choices?.[0]?.message?.content;
+  const content =
+    typeof messageContent === "string"
+      ? messageContent
+      : Array.isArray(messageContent)
+        ? messageContent
+            .map((item: { type?: string; text?: string }) =>
+              item?.type === "text" ? (item.text ?? "") : "",
+            )
+            .join("")
+        : typeof data?.result === "string"
+          ? data.result
+          : "";
 
-  if (!content) throw new Error("Empty response from LLM");
+  if (!content) {
+    throw new LLMProviderError(
+      `Empty response from LLM. Response keys: ${Object.keys(data ?? {}).join(",")}`,
+      502,
+      "openrouter",
+      model,
+    );
+  }
 
-  const jsonMatch = content.match(/\{[\s\S]*\}/);
-  if (!jsonMatch) throw new Error("LLM response did not contain valid JSON");
+  const normalizedContent = content
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
 
-  const readIntHeader = (name: string): number | null => {
-    const value = response.headers.get(name);
+  const jsonMatch = normalizedContent.match(/\{[\s\S]*\}/);
+  const jsonText = jsonMatch ? jsonMatch[0] : normalizedContent;
+
+  const readIntHeader = (names: string[]): number | null => {
+    const value = names
+      .map((name) => response.headers.get(name))
+      .find((headerValue) => !!headerValue);
     if (!value) return null;
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : null;
   };
 
   return {
-    parsed: JSON.parse(jsonMatch[0]) as LLMParseResult,
+    parsed: JSON.parse(jsonText) as LLMParseResult,
     rateLimit: {
-      credit_limit: readIntHeader("x-ratelimit-credit-limit"),
-      credit_remaining: readIntHeader("x-ratelimit-credit-remaining"),
+      credit_limit: readIntHeader([
+        "x-ratelimit-credit-limit",
+        "x-ratelimit-limit",
+      ]),
+      credit_remaining: readIntHeader([
+        "x-ratelimit-credit-remaining",
+        "x-ratelimit-remaining",
+      ]),
     },
   };
 }
@@ -380,7 +467,7 @@ export async function parseForIntent(
   if (!systemPrompt) throw new Error(`Unsupported intent: ${intent}`);
 
   const messages: Array<{ role: string; content: string }> = [
-    { role: "assistant", content: systemPrompt },
+    { role: "system", content: systemPrompt },
   ];
 
   if (currentPayload && Object.keys(currentPayload).length > 0) {
@@ -392,5 +479,5 @@ export async function parseForIntent(
 
   messages.push({ role: "user", content: userMessage });
 
-  return callRapidAPI(messages);
+  return callOpenRouter(messages);
 }
