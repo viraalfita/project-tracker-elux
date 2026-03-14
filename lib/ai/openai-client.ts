@@ -5,11 +5,13 @@
  */
 
 const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
-const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-5-nano";
 const OPENAI_MAX_TOKENS = Number.parseInt(
   process.env.OPENAI_MAX_TOKENS ?? "180",
   10,
 );
+const BASE_PARSER_PROMPT =
+  'Parse user command into JSON only. Return exactly: {"payload":{},"missing_fields":[],"reply_to_user":""}. No markdown. missing_fields only for required fields that are null/empty. reply_to_user must be Indonesian, ask only missing required fields, empty string when none. Use YYYY-MM-DD dates. Keep unknown scalar as null, unknown list as []. If DraftJSON exists, keep existing draft values unless user explicitly changes them.';
 const OPENAI_LOG_RESPONSE =
   process.env.OPENAI_LOG_RESPONSE === "true" ||
   process.env.NODE_ENV !== "production";
@@ -50,50 +52,34 @@ export interface ParseForIntentResult {
   rateLimit: OpenAiRateLimit | null;
 }
 
+function compactForPrompt(value: unknown): unknown {
+  if (value === null || value === undefined || value === "") return undefined;
+
+  if (Array.isArray(value)) {
+    const compacted = value
+      .map((item) => compactForPrompt(item))
+      .filter((item) => item !== undefined);
+    return compacted.length > 0 ? compacted : undefined;
+  }
+
+  if (typeof value === "object") {
+    const compactedEntries = Object.entries(value as Record<string, unknown>)
+      .map(([key, item]) => [key, compactForPrompt(item)] as const)
+      .filter(([, item]) => item !== undefined);
+    return compactedEntries.length > 0
+      ? Object.fromEntries(compactedEntries)
+      : undefined;
+  }
+
+  return value;
+}
+
 // ── Per-intent system prompts ────────────────────────────────────────────
 
 const INTENT_PROMPTS: Record<string, string> = {
-  create_epic:
-    "You are a STRICT structured command parser for an internal project management system. Convert the user message into exactly ONE JSON object. Never answer conversationally. Output ONLY valid JSON." +
-    "INTENT: create_epic — Create a new epic (major project milestone)." +
-    "FIELDS TO EXTRACT:" +
-    "- title: The epic name/title. (REQUIRED)" +
-    "- owner: Full name of the person responsible for the epic. (REQUIRED)" +
-    "- start_date: Start date in YYYY-MM-DD. (REQUIRED)" +
-    "- end_date: End date/deadline in YYYY-MM-DD. (REQUIRED)" +
-    '- status: One of: "Not Started", "In Progress", "Done", "On Hold". Default "Not Started" if not stated. (REQUIRED)' +
-    "- members: Array of team member/watcher full names. (OPTIONAL — use [] if not mentioned)" +
-    "- description: Short description of the epic. (OPTIONAL — null if not mentioned)" +
-    "RULES:" +
-    "- missing_fields ONLY contains: title, owner, start_date, end_date, status — whichever are null." +
-    "- NEVER include members or description in missing_fields." +
-    '- If status not mentioned, set status to "Not Started" and do NOT add it to missing_fields.' +
-    "- reply_to_user MUST be in Indonesian, asking only for the specific missing required fields." +
-    'OUTPUT SCHEMA: {"payload":{"title":"string or null","owner":"string or null","start_date":"YYYY-MM-DD or null","end_date":"YYYY-MM-DD or null","status":"string or null","members":["strings"],"description":"string or null"},"missing_fields":["list of null required fields"],"reply_to_user":"Indonesian question"}',
+  create_epic: `${BASE_PARSER_PROMPT} INTENT:create_epic. Payload keys: title, owner, start_date, end_date, status, members, description. Required: title, owner, start_date, end_date. status default "Not Started" (allowed: Not Started|In Progress|Done|On Hold). members default []. description default null. missing_fields may only include title|owner|start_date|end_date.`,
 
-  create_epic_with_tasks:
-    "You are a STRICT structured command parser for an internal project management system. Convert the user message into exactly ONE JSON object. Never answer conversationally. Output ONLY valid JSON." +
-    "INTENT: create_epic_with_tasks — Create a new epic together with one or more tasks under it." +
-    "EPIC FIELDS:" +
-    "- title: Epic name/title. (REQUIRED)" +
-    "- owner: Epic owner full name. (REQUIRED)" +
-    "- start_date: Epic start date YYYY-MM-DD. (REQUIRED)" +
-    "- end_date: Epic end date YYYY-MM-DD. (REQUIRED)" +
-    '- status: "Not Started", "In Progress", "Done", or "On Hold". Default "Not Started". (REQUIRED)' +
-    "- members: Array of member/watcher names. (OPTIONAL)" +
-    "- description: Epic description. (OPTIONAL)" +
-    "TASK FIELDS (for each task mentioned under payload.tasks[]):" +
-    "- title: Task name. (REQUIRED per task)" +
-    "- assignee: Assignee full name. (OPTIONAL — null if not mentioned)" +
-    '- status: "To Do", "In Progress", "Review", "Done". Default "To Do". (OPTIONAL)' +
-    "- due_date: YYYY-MM-DD. (OPTIONAL — null if not mentioned)" +
-    '- priority: "Low", "Medium", "High". Default "Medium". (OPTIONAL)' +
-    "RULES:" +
-    "- missing_fields tracks ONLY epic-level required fields that are null: title, owner, start_date, end_date, status." +
-    "- NEVER put task fields (assignee, due_date, status, priority) in missing_fields — they are optional." +
-    '- If status not stated, default "Not Started" for epic; "To Do" for tasks.' +
-    "- reply_to_user in Indonesian, only asking for missing epic fields." +
-    'OUTPUT SCHEMA: {"payload":{"title":"string or null","owner":"string or null","start_date":"YYYY-MM-DD or null","end_date":"YYYY-MM-DD or null","status":"string or null","members":["strings"],"description":"string or null","tasks":[{"title":"string","assignee":"string or null","status":"string or null","due_date":"YYYY-MM-DD or null","priority":"string or null"}]},"missing_fields":["list of null required epic fields"],"reply_to_user":"Indonesian message"}',
+  create_epic_with_tasks: `${BASE_PARSER_PROMPT} INTENT:create_epic_with_tasks. Epic payload keys: title, owner, start_date, end_date, status, members, description, tasks. Required epic fields: title, owner, start_date, end_date. status default "Not Started" (Not Started|In Progress|Done|On Hold). members default []. description default null. tasks is array; each task keys: title(required if task exists), assignee, status, due_date, priority. task defaults: status "To Do" (To Do|In Progress|Review|Done), priority "Medium", assignee null, due_date null. missing_fields may only include epic required fields (title|owner|start_date|end_date). Never include task fields in missing_fields.`,
 
   update_epic:
     "You are a STRICT structured command parser for an internal project management system. Convert the user message into exactly ONE JSON object. Never answer conversationally. Output ONLY valid JSON." +
@@ -356,6 +342,8 @@ async function callOpenAI(
       model: OPENAI_MODEL,
       messages,
       temperature: 0,
+      top_p: 0.1,
+      n: 1,
       max_tokens: Number.isFinite(OPENAI_MAX_TOKENS) ? OPENAI_MAX_TOKENS : 180,
       response_format: { type: "json_object" },
     }),
@@ -430,13 +418,17 @@ export async function parseForIntent(
   ];
 
   if (currentPayload && Object.keys(currentPayload).length > 0) {
-    messages.push({
-      role: "user",
-      content: `Current draft (fields collected so far): ${JSON.stringify(currentPayload)}`,
-    });
+    const compactDraft = compactForPrompt(currentPayload);
+
+    if (compactDraft && typeof compactDraft === "object") {
+      messages.push({
+        role: "user",
+        content: `DraftJSON:${JSON.stringify(compactDraft)}`,
+      });
+    }
   }
 
-  messages.push({ role: "user", content: userMessage });
+  messages.push({ role: "user", content: `UserText:${userMessage}` });
 
   return callOpenAI(messages);
 }
