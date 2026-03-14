@@ -1,17 +1,24 @@
 /**
- * OpenRouter LLM client.
+ * OpenAI LLM client.
  * Responsibility: ONLY parse user messages into structured JSON.
  * This module NEVER writes to the database.
  */
 
-const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
-const DEFAULT_OPENROUTER_MODEL = "qwen/qwen3-next-80b-a3b-instruct:free";
+const OPENAI_URL = "https://api.openai.com/v1/chat/completions";
+const OPENAI_MODEL = process.env.OPENAI_MODEL ?? "gpt-4o-mini";
+const OPENAI_MAX_TOKENS = Number.parseInt(
+  process.env.OPENAI_MAX_TOKENS ?? "180",
+  10,
+);
+const OPENAI_LOG_RESPONSE =
+  process.env.OPENAI_LOG_RESPONSE === "true" ||
+  process.env.NODE_ENV !== "production";
 
 export class LLMProviderError extends Error {
   constructor(
     message: string,
     public readonly statusCode: number,
-    public readonly provider: "openrouter" = "openrouter",
+    public readonly provider: "openai" = "openai",
     public readonly model?: string,
   ) {
     super(message);
@@ -29,14 +36,18 @@ export interface LLMParseResult {
   reply_to_user: string;
 }
 
-export interface AiProviderRateLimit {
-  credit_limit: number | null;
-  credit_remaining: number | null;
+export interface OpenAiRateLimit {
+  request_limit: number | null;
+  request_remaining: number | null;
+  token_limit: number | null;
+  token_remaining: number | null;
 }
+
+export type AiProviderRateLimit = OpenAiRateLimit;
 
 export interface ParseForIntentResult {
   parsed: LLMParseResult;
-  rateLimit: AiProviderRateLimit | null;
+  rateLimit: OpenAiRateLimit | null;
 }
 
 // ── Per-intent system prompts ────────────────────────────────────────────
@@ -327,62 +338,25 @@ export const SUPPORTED_INTENTS = new Set(Object.keys(INTENT_REQUIRED_FIELDS));
 
 // ── Internal LLM caller ─────────────────────────────────────────────────────────────
 
-async function callOpenRouter(
+async function callOpenAI(
   messages: Array<{ role: string; content: string }>,
 ): Promise<ParseForIntentResult> {
-  const apiKey = process.env.OPENROUTER_API_KEY ?? "";
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
-    throw new Error("Missing OPENROUTER_API_KEY");
+    throw new Error("OPENAI_API_KEY is not configured");
   }
 
-  const primaryModel = process.env.OPENROUTER_MODEL ?? DEFAULT_OPENROUTER_MODEL;
-  const fallbackModels = (process.env.OPENROUTER_FALLBACK_MODELS ?? "")
-    .split(",")
-    .map((m) => m.trim())
-    .filter(Boolean);
-
-  const modelsToTry = [primaryModel, ...fallbackModels];
-  let lastError: unknown = null;
-
-  for (const model of modelsToTry) {
-    try {
-      return await requestOpenRouter(messages, apiKey, model);
-    } catch (error) {
-      lastError = error;
-      if (!(error instanceof LLMProviderError)) throw error;
-      if (error.statusCode !== 429) throw error;
-      if (model === modelsToTry[modelsToTry.length - 1]) throw error;
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error("OpenRouter call failed");
-}
-
-async function requestOpenRouter(
-  messages: Array<{ role: string; content: string }>,
-  apiKey: string,
-  model: string,
-): Promise<ParseForIntentResult> {
-  const response = await fetch(OPENROUTER_URL, {
+  const response = await fetch(OPENAI_URL, {
     method: "POST",
     headers: {
       "content-type": "application/json",
       Authorization: `Bearer ${apiKey}`,
-      ...(process.env.OPENROUTER_SITE_URL
-        ? { "HTTP-Referer": process.env.OPENROUTER_SITE_URL }
-        : {}),
-      ...(process.env.OPENROUTER_SITE_NAME
-        ? { "X-Title": process.env.OPENROUTER_SITE_NAME }
-        : {}),
     },
     body: JSON.stringify({
-      model,
+      model: OPENAI_MODEL,
       messages,
       temperature: 0,
-      top_p: 0.5,
-      max_tokens: 300,
+      max_tokens: Number.isFinite(OPENAI_MAX_TOKENS) ? OPENAI_MAX_TOKENS : 180,
       response_format: { type: "json_object" },
     }),
   });
@@ -390,66 +364,51 @@ async function requestOpenRouter(
   if (!response.ok) {
     const text = await response.text().catch(() => "");
     throw new LLMProviderError(
-      `OpenRouter responded ${response.status}: ${text.slice(0, 300)}`,
+      `OpenAI responded ${response.status}: ${text.slice(0, 200)}`,
       response.status,
-      "openrouter",
-      model,
+      "openai",
+      OPENAI_MODEL,
     );
   }
 
   const data = await response.json();
-  const messageContent = data?.choices?.[0]?.message?.content;
-  const content =
-    typeof messageContent === "string"
-      ? messageContent
-      : Array.isArray(messageContent)
-        ? messageContent
-            .map((item: { type?: string; text?: string }) =>
-              item?.type === "text" ? (item.text ?? "") : "",
-            )
-            .join("")
-        : typeof data?.result === "string"
-          ? data.result
-          : "";
+  const content: string =
+    data?.choices?.[0]?.message?.content ?? data?.result ?? "";
 
-  if (!content) {
-    throw new LLMProviderError(
-      `Empty response from LLM. Response keys: ${Object.keys(data ?? {}).join(",")}`,
-      502,
-      "openrouter",
-      model,
-    );
+  if (OPENAI_LOG_RESPONSE) {
+    console.log("[OpenAI][parse] raw response", {
+      model: OPENAI_MODEL,
+      usage: data?.usage ?? null,
+      finish_reason: data?.choices?.[0]?.finish_reason ?? null,
+      content,
+    });
   }
 
-  const normalizedContent = content
-    .replace(/^```json\s*/i, "")
-    .replace(/^```\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
+  if (!content) throw new Error("Empty response from LLM");
 
-  const jsonMatch = normalizedContent.match(/\{[\s\S]*\}/);
-  const jsonText = jsonMatch ? jsonMatch[0] : normalizedContent;
+  const jsonMatch = content.match(/\{[\s\S]*\}/);
+  if (!jsonMatch) throw new Error("LLM response did not contain valid JSON");
 
-  const readIntHeader = (names: string[]): number | null => {
-    const value = names
-      .map((name) => response.headers.get(name))
-      .find((headerValue) => !!headerValue);
+  const readIntHeader = (name: string): number | null => {
+    const value = response.headers.get(name);
     if (!value) return null;
     const parsed = Number.parseInt(value, 10);
     return Number.isFinite(parsed) ? parsed : null;
   };
 
+  const parsed = JSON.parse(jsonMatch[0]) as LLMParseResult;
+
+  if (OPENAI_LOG_RESPONSE) {
+    console.log("[OpenAI][parse] parsed json", parsed);
+  }
+
   return {
-    parsed: JSON.parse(jsonText) as LLMParseResult,
+    parsed,
     rateLimit: {
-      credit_limit: readIntHeader([
-        "x-ratelimit-credit-limit",
-        "x-ratelimit-limit",
-      ]),
-      credit_remaining: readIntHeader([
-        "x-ratelimit-credit-remaining",
-        "x-ratelimit-remaining",
-      ]),
+      request_limit: readIntHeader("x-ratelimit-limit-requests"),
+      request_remaining: readIntHeader("x-ratelimit-remaining-requests"),
+      token_limit: readIntHeader("x-ratelimit-limit-tokens"),
+      token_remaining: readIntHeader("x-ratelimit-remaining-tokens"),
     },
   };
 }
@@ -479,5 +438,5 @@ export async function parseForIntent(
 
   messages.push({ role: "user", content: userMessage });
 
-  return callOpenRouter(messages);
+  return callOpenAI(messages);
 }

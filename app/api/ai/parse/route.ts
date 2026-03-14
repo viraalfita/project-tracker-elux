@@ -36,7 +36,7 @@ import {
   LLMProviderError,
   parseForIntent,
   SUPPORTED_INTENTS,
-} from "@/lib/ai/rapidapi-client";
+} from "@/lib/ai/openai-client";
 import { resolveEntityByTitle, resolveUserByName } from "@/lib/ai/validators";
 import {
   PBEpic,
