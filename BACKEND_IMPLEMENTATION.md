@@ -42,7 +42,7 @@
                              ▼
 ┌─────────────────────────────────────────────────────────────┐
 │         PocketBase v0.36.5  (self-hosted)                    │
-│         https://devpb.eluxemang.top                           │
+│         https://pb.eluxemang.top                           │
 │                                                             │
 │   Collections: users, epics, tasks, subtasks,               │
 │                comments, epic_docs, goals, goal_kpis         │
@@ -63,7 +63,7 @@ File: [lib/pocketbase.ts](lib/pocketbase.ts)
 import PocketBase from "pocketbase";
 
 const PB_URL =
-  process.env.NEXT_PUBLIC_POCKETBASE_URL ?? "https://devpb.eluxemang.top";
+  process.env.NEXT_PUBLIC_POCKETBASE_URL ?? "https://pb.eluxemang.top";
 
 export const pb = new PocketBase(PB_URL);
 
@@ -674,7 +674,7 @@ Buat file `.env.local` di root project:
 
 ```env
 # URL PocketBase (wajib — digunakan di client & server)
-NEXT_PUBLIC_POCKETBASE_URL=https://devpb.eluxemang.top
+NEXT_PUBLIC_POCKETBASE_URL=https://pb.eluxemang.top
 
 # Kredensial superuser PocketBase (hanya untuk server-side & setup script)
 PB_ADMIN_EMAIL=admin@example.com

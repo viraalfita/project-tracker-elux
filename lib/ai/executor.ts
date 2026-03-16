@@ -13,7 +13,7 @@ import {
 import PocketBase from "pocketbase";
 
 const PB_URL =
-  process.env.NEXT_PUBLIC_POCKETBASE_URL ?? "https://devpb.eluxemang.top";
+  process.env.NEXT_PUBLIC_POCKETBASE_URL ?? "https://pb.eluxemang.top";
 const PB_ADMIN_EMAIL = process.env.PB_ADMIN_EMAIL ?? "";
 const PB_ADMIN_PASSWORD = process.env.PB_ADMIN_PASSWORD ?? "";
 
