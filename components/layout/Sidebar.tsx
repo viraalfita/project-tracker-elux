@@ -35,7 +35,12 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/board", label: "Board", icon: Kanban },
   { href: "/my-work", label: "My Work", icon: CheckSquare },
   { href: "/utilization", label: "Team Workload", icon: BarChart2 },
-  { href: "/workspace", label: "Workspace", icon: Users, roles: ["Admin"] },
+  {
+    href: "/workspace",
+    label: "Workspace",
+    icon: Users,
+    roles: ["Admin", "Manager"],
+  },
 ];
 
 const ROLE_BADGE: Record<Role, string> = {

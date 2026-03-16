@@ -38,6 +38,28 @@ async function getSuperuserClient(): Promise<PocketBase> {
 }
 
 /**
+ * Verify that the bearer token belongs to an Admin or Manager user.
+ * Returns the role string, or null if verification fails.
+ */
+async function verifyAdminOrManagerToken(
+  token: string,
+): Promise<"Admin" | "Manager" | null> {
+  try {
+    const pb = new PocketBase(PB_URL);
+    pb.autoCancellation(false);
+    pb.authStore.save(token, null);
+    const result = await pb
+      .collection("users")
+      .authRefresh<{ role?: string }>();
+    const role = result.record?.role;
+    if (role === "Admin" || role === "Manager") return role;
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Verify that the bearer token belongs to an Admin user.
  * Returns false on any error (expired token, network failure, etc.).
  */
@@ -62,11 +84,8 @@ function extractToken(request: NextRequest): string {
 }
 
 /** Return a 403 Forbidden response. */
-function forbidden() {
-  return NextResponse.json(
-    { error: "Forbidden: Admin access required." },
-    { status: 403 },
-  );
+function forbidden(msg = "Forbidden: Admin access required.") {
+  return NextResponse.json({ error: msg }, { status: 403 });
 }
 
 // ─── POST /api/admin/users — create user ──────────────────────────────────────
@@ -104,7 +123,9 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   const token = extractToken(request);
-  if (!token || !(await verifyAdminToken(token))) return forbidden();
+  const callerRole = await verifyAdminOrManagerToken(token);
+  if (!callerRole)
+    return forbidden("Forbidden: Admin or Manager access required.");
 
   const body = await request.json().catch(() => ({}));
   const { userId, role } = body as { userId?: string; role?: string };
@@ -118,6 +139,22 @@ export async function PATCH(request: NextRequest) {
 
   try {
     const pb = await getSuperuserClient();
+
+    // Manager guard: cannot promote to Admin and cannot modify Admin users
+    if (callerRole === "Manager") {
+      if (role === "Admin") {
+        return forbidden("Managers cannot assign the Admin role.");
+      }
+      const target = await pb
+        .collection("users")
+        .getOne<{ role?: string }>(userId);
+      if (target.role === "Admin" || target.role === "Manager") {
+        return forbidden(
+          "Managers can only change the role of Members and Viewers.",
+        );
+      }
+    }
+
     const record = await pb.collection("users").update(userId, { role });
     return NextResponse.json(record);
   } catch (err: unknown) {
@@ -130,7 +167,9 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   const token = extractToken(request);
-  if (!token || !(await verifyAdminToken(token))) return forbidden();
+  const callerRole = await verifyAdminOrManagerToken(token);
+  if (!callerRole)
+    return forbidden("Forbidden: Admin or Manager access required.");
 
   const body = await request.json().catch(() => ({}));
   const { userId } = body as { userId?: string };
@@ -141,6 +180,19 @@ export async function DELETE(request: NextRequest) {
 
   try {
     const pb = await getSuperuserClient();
+
+    // Manager guard: cannot revoke Admin or Manager users
+    if (callerRole === "Manager") {
+      const target = await pb
+        .collection("users")
+        .getOne<{ role?: string }>(userId);
+      if (target.role === "Admin" || target.role === "Manager") {
+        return forbidden(
+          "Managers can only revoke access for Members and Viewers.",
+        );
+      }
+    }
+
     await pb.collection("users").delete(userId);
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
