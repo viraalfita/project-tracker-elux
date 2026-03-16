@@ -36,7 +36,7 @@ const OPEN_KEY = "ai_chat_open";
 
 const INITIAL_MESSAGE: Message = {
   role: "assistant",
-  text: "Halo! Ketik perintahmu langsung, misalnya: \"buatkan epic Project X, owner vira\" atau \"cek status task Design Mockup\".",
+  text: 'Halo! Ketik perintahmu langsung, misalnya: "buatkan epic Project X, owner vira" atau "cek status task Design Mockup".',
 };
 
 function loadMessages(): Message[] {

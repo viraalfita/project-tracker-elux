@@ -14,9 +14,9 @@
 
 import {
   AiProviderRateLimit,
+  detectIntent,
   INTENT_REQUIRED_FIELDS,
   LLMProviderError,
-  detectIntent,
   parseForIntent,
   SUPPORTED_INTENTS,
 } from "@/lib/ai/deepseek-client";
@@ -435,7 +435,7 @@ export async function POST(request: NextRequest) {
     if (!detected) {
       return NextResponse.json({
         reply:
-          "Perintah tidak dikenali. Coba lebih spesifik, misalnya: \"buatkan epic Project X, owner vira\" atau \"hapus task Design Mockup\".",
+          'Perintah tidak dikenali. Coba lebih spesifik, misalnya: "buatkan epic Project X, owner vira" atau "hapus task Design Mockup".',
         status: "unknown",
       });
     }
