@@ -48,7 +48,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
       <main className="flex-1 overflow-y-auto">{children}</main>
-      <AiCommandChat />
+      {(currentUser.role === "Admin" || currentUser.role === "Manager") && (
+        <AiCommandChat />
+      )}
     </div>
   );
 }
