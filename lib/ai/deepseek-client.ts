@@ -434,3 +434,27 @@ export async function parseForIntent(
 
   return callDeepSeek(messages);
 }
+
+/**
+ * Detect the intent from a free-form user message.
+ * Returns null if the message cannot be mapped to a known intent.
+ */
+export async function detectIntent(
+  userMessage: string,
+): Promise<{ intent: string | null; rateLimit: DeepSeekRateLimit | null }> {
+  const intents = Array.from(SUPPORTED_INTENTS).join(", ");
+  const systemPrompt = `Return only JSON: {"intent":"<id_or_null>"}. Classify user message into one of: ${intents}. If unclear return null.`;
+
+  const result = await callDeepSeek([
+    { role: "system", content: systemPrompt },
+    { role: "user", content: userMessage },
+  ]);
+
+  const raw = result.parsed as unknown as Record<string, unknown>;
+  const intent =
+    typeof raw.intent === "string" && SUPPORTED_INTENTS.has(raw.intent)
+      ? raw.intent
+      : null;
+
+  return { intent, rateLimit: result.rateLimit };
+}

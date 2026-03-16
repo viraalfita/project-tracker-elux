@@ -1,7 +1,7 @@
 "use client";
 
 import { pb } from "@/lib/pocketbase";
-import { Bot, ChevronDown, Loader2, Send, X, Zap } from "lucide-react";
+import { Bot, ChevronDown, Loader2, Send, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 interface SummaryData {
@@ -31,94 +31,12 @@ interface RateLimitData {
   credit_remaining: number | null;
 }
 
-const INTENT_GROUPS = [
-  {
-    group: "Epic",
-    intents: [
-      { id: "create_epic", label: "Buat Epic" },
-      { id: "create_epic_with_tasks", label: "Buat Epic + Task" },
-      { id: "update_epic", label: "Edit Epic" },
-      { id: "delete_epic", label: "Hapus Epic", isDangerous: true },
-    ],
-  },
-  {
-    group: "Task",
-    intents: [
-      { id: "create_task", label: "Buat Task" },
-      { id: "update_task", label: "Edit Task" },
-      { id: "delete_task", label: "Hapus Task", isDangerous: true },
-    ],
-  },
-  {
-    group: "Subtask",
-    intents: [
-      { id: "create_subtask", label: "Buat Subtask" },
-      { id: "update_subtask", label: "Edit Subtask" },
-      { id: "delete_subtask", label: "Hapus Subtask", isDangerous: true },
-    ],
-  },
-  {
-    group: "Goal",
-    intents: [
-      { id: "create_goal", label: "Buat Goal" },
-      { id: "update_goal", label: "Edit Goal" },
-      { id: "delete_goal", label: "Hapus Goal", isDangerous: true },
-    ],
-  },
-  {
-    group: "Lainnya",
-    intents: [{ id: "link_epic_to_goal", label: "Hubungkan Epic ke Goal" }],
-  },
-  {
-    group: "Tanya Info",
-    intents: [
-      { id: "query_epic", label: "Info Epic" },
-      { id: "query_task", label: "Info Task" },
-      { id: "query_goal", label: "Info Goal" },
-      { id: "query_subtask", label: "Info Subtask" },
-      { id: "query_member_work", label: "Pekerjaan Member" },
-    ],
-  },
-];
-
-const INTENT_HINTS: Record<string, string> = {
-  create_epic:
-    "Contoh: buatkan epic Research Design Q3 dengan owner vira, mulai 1 jan 2026, selesai 31 mar 2026. Ownernya Vira. Statusnya Not Started.",
-  create_epic_with_tasks:
-    "Contoh: buatkan epic Rebrand mulai 1 jan 2026 dan selesai 31 mar 2026, owner vira, task: design mockup assign dewi, coding API assign vira",
-  update_epic:
-    "Contoh: ubah epic Research Design, ganti statusnya jadi In Progress",
-  delete_epic: "Contoh: hapus epic Research Design Q3",
-  create_task:
-    "Contoh: buatkan task Design Mockup di epic Rebrand, assignee dewi, due 15 feb",
-  update_task: "Contoh: ubah task Design Mockup, ganti prioritas jadi High",
-  delete_task: "Contoh: hapus task Design Mockup",
-  create_subtask:
-    "Contoh: buatkan subtask wireframe di task Design Mockup, assignee vira",
-  update_subtask: "Contoh: ubah subtask wireframe, tandai sebagai Done",
-  delete_subtask: "Contoh: hapus subtask wireframe dari task Design Mockup",
-  create_goal:
-    "Contoh: buatkan goal Tingkatkan Revenue Q1, tambahkan kpi conversion rate dan targetnya 200%, owner vira",
-  update_goal: "Contoh: ubah goal Revenue Q1, perbarui status jadi At Risk",
-  delete_goal: "Contoh: hapus goal Revenue Q1",
-  link_epic_to_goal:
-    "Contoh: hubungkan epic Research Design dan epic Rebrand ke goal Revenue Q1",
-  query_epic: "Contoh: redesign siakad statusnya apa? / info epic landing page",
-  query_task:
-    "Contoh: task design mockup sudah selesai belum? / info task coding API",
-  query_goal: "Contoh: goal revenue Q1 progress KPI-nya gimana?",
-  query_subtask: "Contoh: subtask wireframe sudah selesai belum?",
-  query_member_work:
-    "Contoh: Vira lagi ngerjain task apa aja? / beban kerja Dewi di epic mana?",
-};
-
 const STORAGE_KEY = "ai_chat_history";
-const INTENT_KEY = "ai_selected_intent";
 const OPEN_KEY = "ai_chat_open";
 
 const INITIAL_MESSAGE: Message = {
   role: "assistant",
-  text: "Halo! Pilih jenis perintah di bawah untuk memulai.",
+  text: "Halo! Ketik perintahmu langsung, misalnya: \"buatkan epic Project X, owner vira\" atau \"cek status task Design Mockup\".",
 };
 
 function loadMessages(): Message[] {
@@ -151,10 +69,6 @@ export function AiCommandChat() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>(loadMessages);
   const [loading, setLoading] = useState(false);
-  const [selectedIntent, setSelectedIntent] = useState<string | null>(() => {
-    if (typeof window === "undefined") return null;
-    return localStorage.getItem(INTENT_KEY);
-  });
 
   const bottomRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -167,19 +81,6 @@ export function AiCommandChat() {
       // ignore quota errors
     }
   }, [messages]);
-
-  // Persist selectedIntent
-  useEffect(() => {
-    try {
-      if (selectedIntent) {
-        localStorage.setItem(INTENT_KEY, selectedIntent);
-      } else {
-        localStorage.removeItem(INTENT_KEY);
-      }
-    } catch {
-      // ignore
-    }
-  }, [selectedIntent]);
 
   useEffect(() => {
     try {
@@ -214,26 +115,6 @@ export function AiCommandChat() {
     return () => window.removeEventListener("keydown", handleKey);
   }, [open]);
 
-  // Show intent picker when no intent selected and conversation is at a natural stop
-  const lastMsg = messages[messages.length - 1];
-  const showIntentPicker =
-    !selectedIntent &&
-    !loading &&
-    (messages.length <= 1 ||
-      lastMsg?.status === "success" ||
-      lastMsg?.status === "cancelled" ||
-      lastMsg?.status === "error" ||
-      lastMsg?.status === "answer");
-
-  function selectIntent(intentId: string) {
-    setSelectedIntent(intentId);
-    setTimeout(() => inputRef.current?.focus(), 80);
-  }
-
-  const selectedIntentObj = INTENT_GROUPS.flatMap((g) => g.intents).find(
-    (i) => i.id === selectedIntent,
-  );
-
   async function handleSend() {
     const text = input.trim();
     if (!text || loading) return;
@@ -246,7 +127,6 @@ export function AiCommandChat() {
     try {
       const token = pb.authStore.token;
       const body: Record<string, unknown> = { message: text };
-      if (selectedIntent) body.preselected_intent = selectedIntent;
 
       const res = await fetch("/api/ai/parse", {
         method: "POST",
@@ -281,9 +161,6 @@ export function AiCommandChat() {
           rateLimitPct,
         },
       ]);
-      if (data.status === "success" || data.status === "answer") {
-        setSelectedIntent(null);
-      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -320,9 +197,6 @@ export function AiCommandChat() {
           status: data.status,
         },
       ]);
-      if (data.status === "success") {
-        setSelectedIntent(null);
-      }
     } catch {
       setMessages((prev) => [
         ...prev,
@@ -361,7 +235,6 @@ export function AiCommandChat() {
           status: "cancelled",
         },
       ]);
-      setSelectedIntent(null);
       setLoading(false);
       setTimeout(() => inputRef.current?.focus(), 50);
     }
@@ -388,7 +261,6 @@ export function AiCommandChat() {
 
     const reset: Message[] = [INITIAL_MESSAGE];
     setMessages(reset);
-    setSelectedIntent(null);
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(reset));
     } catch {
@@ -565,71 +437,6 @@ export function AiCommandChat() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Intent picker — shown when no intent is selected and conversation is idle */}
-          {showIntentPicker && (
-            <div className="border-t border-border px-4 py-3 space-y-2 max-h-52 overflow-y-auto">
-              <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground flex items-center gap-1">
-                <Zap className="h-3 w-3" />
-                Pilih jenis perintah
-              </p>
-              {INTENT_GROUPS.map((group) => (
-                <div key={group.group}>
-                  <p className="text-[10px] text-muted-foreground mb-1 font-medium">
-                    {group.group}
-                  </p>
-                  <div className="flex flex-wrap gap-1.5">
-                    {group.intents.map((intent) => (
-                      <button
-                        key={intent.id}
-                        onClick={() => selectIntent(intent.id)}
-                        className={`rounded-full px-2.5 py-1 text-[11px] font-medium border transition-colors ${
-                          intent.isDangerous
-                            ? "border-red-200 text-red-700 hover:bg-red-50"
-                            : "border-indigo-200 text-indigo-700 hover:bg-indigo-50"
-                        }`}
-                      >
-                        {intent.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Active intent badge + change button */}
-          {selectedIntent && (
-            <div className="border-t border-border px-4 py-2 flex items-center justify-between">
-              <div className="flex items-center gap-1.5">
-                <Zap className="h-3 w-3 text-indigo-600" />
-                <span
-                  className={`text-[11px] font-semibold ${
-                    selectedIntentObj?.isDangerous
-                      ? "text-red-700"
-                      : "text-indigo-700"
-                  }`}
-                >
-                  {selectedIntentObj?.label ?? selectedIntent}
-                </span>
-              </div>
-              <button
-                onClick={() => setSelectedIntent(null)}
-                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-              >
-                Ganti
-              </button>
-            </div>
-          )}
-
-          {/* Hint text for selected intent */}
-          {selectedIntent && INTENT_HINTS[selectedIntent] && (
-            <div className="px-4 pb-1">
-              <p className="text-[10px] text-muted-foreground italic">
-                {INTENT_HINTS[selectedIntent]}
-              </p>
-            </div>
-          )}
-
           {/* Input */}
           <div className="rounded-b-xl border-t border-border bg-slate-50 p-3">
             <div className="flex items-end gap-2">
@@ -639,17 +446,13 @@ export function AiCommandChat() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
-                placeholder={
-                  selectedIntent
-                    ? "Ketik perintahmu di sini…"
-                    : "Pilih jenis perintah terlebih dahulu…"
-                }
-                disabled={loading || !selectedIntent}
+                placeholder="Ketik perintahmu di sini…"
+                disabled={loading}
                 className="flex-1 resize-none rounded-lg border border-border bg-white px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-indigo-400 disabled:opacity-50"
               />
               <button
                 onClick={handleSend}
-                disabled={loading || !input.trim() || !selectedIntent}
+                disabled={loading || !input.trim()}
                 className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-40 transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400"
                 aria-label="Send message"
               >

@@ -16,6 +16,7 @@ import {
   AiProviderRateLimit,
   INTENT_REQUIRED_FIELDS,
   LLMProviderError,
+  detectIntent,
   parseForIntent,
   SUPPORTED_INTENTS,
 } from "@/lib/ai/deepseek-client";
@@ -422,18 +423,23 @@ export async function POST(request: NextRequest) {
   const existingDraft = getDraft(userId);
 
   const lockedIntent = existingDraft?.intent ?? null;
-  const selectedIntent =
+  let selectedIntent =
     lockedIntent ??
     (preselected_intent && SUPPORTED_INTENTS.has(preselected_intent)
       ? preselected_intent
       : null);
 
   if (!selectedIntent) {
-    return NextResponse.json({
-      reply:
-        "Silakan pilih jenis perintah terlebih dahulu (misalnya: Buat Epic, Edit Task, dll.).",
-      status: "unknown",
-    });
+    const safeMessage = typeof message === "string" ? message : "";
+    const { intent: detected } = await detectIntent(safeMessage);
+    if (!detected) {
+      return NextResponse.json({
+        reply:
+          "Perintah tidak dikenali. Coba lebih spesifik, misalnya: \"buatkan epic Project X, owner vira\" atau \"hapus task Design Mockup\".",
+        status: "unknown",
+      });
+    }
+    selectedIntent = detected;
   }
 
   // ── LLM Parse ────────────────────────────────────────────────────────────
