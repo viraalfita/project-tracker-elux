@@ -12,6 +12,13 @@
  * - Ambiguous name matches trigger a clarification request instead of guessing.
  */
 
+import {
+  AiProviderRateLimit,
+  INTENT_REQUIRED_FIELDS,
+  LLMProviderError,
+  parseForIntent,
+  SUPPORTED_INTENTS,
+} from "@/lib/ai/deepseek-client";
 import { clearDraft, getDraft, saveDraft } from "@/lib/ai/draft-store";
 import {
   executeCreateEpic,
@@ -30,13 +37,6 @@ import {
   executeUpdateTask,
   KpiInput,
 } from "@/lib/ai/executor";
-import {
-  AiProviderRateLimit,
-  INTENT_REQUIRED_FIELDS,
-  LLMProviderError,
-  parseForIntent,
-  SUPPORTED_INTENTS,
-} from "@/lib/ai/openai-client";
 import { resolveEntityByTitle, resolveUserByName } from "@/lib/ai/validators";
 import {
   PBEpic,
@@ -118,6 +118,20 @@ const INTENT_LABELS: Record<string, string> = {
   query_subtask: "Info Subtask",
   query_member_work: "Info Pekerjaan Member",
 };
+
+const AUTO_EXECUTE_CREATE_INTENTS = new Set([
+  "create_epic",
+  "create_epic_with_tasks",
+  "create_task",
+  "create_subtask",
+  "create_goal",
+]);
+
+const TITLE_ONLY_CREATE_INTENTS = new Set([
+  "create_epic",
+  "create_epic_with_tasks",
+  "create_goal",
+]);
 
 export async function POST(request: NextRequest) {
   // ── Auth ────────────────────────────────────────────────────────────────
@@ -482,7 +496,9 @@ export async function POST(request: NextRequest) {
   }
 
   // ── Missing fields check ─────────────────────────────────────────────────
-  const requiredFields = INTENT_REQUIRED_FIELDS[selectedIntent] ?? [];
+  const requiredFields = TITLE_ONLY_CREATE_INTENTS.has(selectedIntent)
+    ? ["title"]
+    : (INTENT_REQUIRED_FIELDS[selectedIntent] ?? []);
   const blockingMissing = requiredFields.filter((f) => {
     const val = mergedPayload[f];
     if (val === null || val === undefined || val === "") return true;
@@ -591,7 +607,22 @@ export async function POST(request: NextRequest) {
     selectedIntent === "create_epic" ||
     selectedIntent === "create_epic_with_tasks"
   ) {
-    const ownerRes = tryResolveUser(mergedPayload.owner as string, "owner");
+    const fallbackOwner = allUsers.find((u) => u.id === userId)?.name ?? null;
+    const ownerName =
+      (typeof mergedPayload.owner === "string" &&
+      mergedPayload.owner.trim().length > 0
+        ? mergedPayload.owner
+        : fallbackOwner) ?? null;
+    if (!ownerName) {
+      return NextResponse.json({
+        reply: "Owner tidak ditemukan. Silakan isi owner secara eksplisit.",
+        status: "collecting_fields",
+        missing_fields: ["owner"],
+      });
+    }
+
+    mergedPayload.owner = ownerName;
+    const ownerRes = tryResolveUser(ownerName, "owner");
     if (ownerRes instanceof NextResponse) return ownerRes;
     resolved.owner_id = ownerRes.id;
 
@@ -896,7 +927,22 @@ export async function POST(request: NextRequest) {
     summaryRows.push({ label: "Subtask", value: subRes.displayTitle });
     isDangerous = true;
   } else if (selectedIntent === "create_goal") {
-    const ownerRes = tryResolveUser(mergedPayload.owner as string, "owner");
+    const fallbackOwner = allUsers.find((u) => u.id === userId)?.name ?? null;
+    const ownerName =
+      (typeof mergedPayload.owner === "string" &&
+      mergedPayload.owner.trim().length > 0
+        ? mergedPayload.owner
+        : fallbackOwner) ?? null;
+    if (!ownerName) {
+      return NextResponse.json({
+        reply: "Owner tidak ditemukan. Silakan isi owner secara eksplisit.",
+        status: "collecting_fields",
+        missing_fields: ["owner"],
+      });
+    }
+
+    mergedPayload.owner = ownerName;
+    const ownerRes = tryResolveUser(ownerName, "owner");
     if (ownerRes instanceof NextResponse) return ownerRes;
     resolved.owner_id = ownerRes.id;
 
@@ -1259,6 +1305,134 @@ export async function POST(request: NextRequest) {
         })
         .join(" | ");
     }
+  }
+
+  if (AUTO_EXECUTE_CREATE_INTENTS.has(selectedIntent)) {
+    let result;
+    let successMsg = "Berhasil!";
+
+    try {
+      switch (selectedIntent) {
+        case "create_epic": {
+          result = await executeCreateEpic(
+            {
+              title: mergedPayload.title as string,
+              owner: mergedPayload.owner as string,
+              start_date: (mergedPayload.start_date as string) ?? null,
+              end_date: (mergedPayload.end_date as string) ?? null,
+              status: (mergedPayload.status as string) ?? null,
+              members: (mergedPayload.members as string[]) ?? [],
+              description: (mergedPayload.description as string) ?? null,
+            },
+            resolved.owner_id!,
+            resolved.member_ids ?? [],
+          );
+          successMsg = `Epic "${result.title}" berhasil dibuat! 🎉`;
+          break;
+        }
+
+        case "create_epic_with_tasks": {
+          const tasks =
+            (((mergedPayload.tasks as unknown[]) ?? []) as Array<{
+              title: string;
+              assignee: string | null;
+              status: string | null;
+              due_date: string | null;
+              priority: string | null;
+            }>) ?? [];
+          result = await executeCreateEpicWithTasks(
+            {
+              title: mergedPayload.title as string,
+              owner: mergedPayload.owner as string,
+              start_date: (mergedPayload.start_date as string) ?? null,
+              end_date: (mergedPayload.end_date as string) ?? null,
+              status: (mergedPayload.status as string) ?? null,
+              members: (mergedPayload.members as string[]) ?? [],
+              description: (mergedPayload.description as string) ?? null,
+            },
+            tasks,
+            resolved.owner_id!,
+            resolved.member_ids ?? [],
+            new Map(Object.entries(resolved.assignee_map ?? {})),
+          );
+          const tc = result.taskIds?.length ?? 0;
+          successMsg = `Epic "${result.title}" beserta ${tc} task berhasil dibuat! 🎉`;
+          break;
+        }
+
+        case "create_task": {
+          result = await executeCreateTask(
+            resolved.epic_id!,
+            {
+              title: mergedPayload.title as string,
+              status: (mergedPayload.status as string) ?? null,
+              priority: (mergedPayload.priority as string) ?? null,
+              due_date: (mergedPayload.due_date as string) ?? null,
+              description: (mergedPayload.description as string) ?? null,
+            },
+            resolved.assignee_id ?? null,
+          );
+          successMsg = `Task "${result.title}" berhasil dibuat!`;
+          break;
+        }
+
+        case "create_subtask": {
+          result = await executeCreateSubtask(
+            resolved.task_id!,
+            {
+              title: mergedPayload.title as string,
+              due_date: (mergedPayload.due_date as string) ?? null,
+            },
+            resolved.assignee_id ?? null,
+          );
+          successMsg = `Subtask "${result.title}" berhasil dibuat!`;
+          break;
+        }
+
+        case "create_goal": {
+          const kpis = ((mergedPayload.kpis as KpiInput[]) ?? []).filter(
+            (k) => k?.label && k?.target != null,
+          );
+          result = await executeCreateGoal(
+            {
+              title: mergedPayload.title as string,
+              description: (mergedPayload.description as string) ?? null,
+            },
+            resolved.owner_id!,
+            kpis,
+          );
+          const kpiMsg = kpis.length > 0 ? ` dengan ${kpis.length} KPI` : "";
+          successMsg = `Goal "${result.title}"${kpiMsg} berhasil dibuat!`;
+          break;
+        }
+
+        default:
+          break;
+      }
+    } catch (err) {
+      clearDraft(userId);
+      const msg = err instanceof Error ? err.message : "Unknown error";
+      console.error("[AI executor] Unexpected auto-create error:", msg);
+      return NextResponse.json({
+        reply: `Terjadi kesalahan: ${msg}`,
+        status: "error",
+      });
+    }
+
+    clearDraft(userId);
+
+    if (!result?.success) {
+      console.error(
+        "[AI executor] Auto-create DB write failed:",
+        result?.error,
+      );
+      return jsonWithRateLimit({
+        reply: `Gagal: ${result?.error ?? "Unknown error"}`,
+        status: "error",
+      });
+    }
+
+    return jsonWithRateLimit({ reply: successMsg, status: "success" });
   }
 
   saveDraft(userId, {
