@@ -67,14 +67,20 @@ export function getTaskHealth(task: Task): HealthStatus {
 
   if (task.startDate && task.dueDate) {
     // IDEAL: expected progress based on elapsed time
+    // Only applies while still within the timeline (before due date).
+    // If dueDate === today, fall through to simple fallback so the task
+    // is treated as "At Risk" (not "Delayed") while still within deadline.
     const totalDays = diffDays(task.dueDate, task.startDate);
     if (totalDays > 0) {
       const elapsedDays = Math.max(diffDays(today, task.startDate), 0);
-      const expectedProgress = Math.min((elapsedDays / totalDays) * 100, 100);
-      const gap = expectedProgress - progress;
-      if (gap > 40) return "Delayed";
-      if (gap > 20) return "At Risk";
-      return "On Track";
+      if (elapsedDays < totalDays) {
+        const expectedProgress = (elapsedDays / totalDays) * 100;
+        const gap = expectedProgress - progress;
+        if (gap > 40) return "Delayed";
+        if (gap > 20) return "At Risk";
+        return "On Track";
+      }
+      // elapsedDays === totalDays → due today → fall through to simple check
     }
   }
 

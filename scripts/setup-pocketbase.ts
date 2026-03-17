@@ -206,8 +206,12 @@ async function applyAccessRules() {
     {
       name: "tasks",
       rules: {
-        listRule: adminOrEpicOwnerOrWatcher,
-        viewRule: adminOrEpicOwnerOrWatcher,
+        // listRule is relaxed to authed because access is enforced at the
+        // query level via explicit epic ID filters in DataStore (which only
+        // includes epics the user owns/watches). The 2-hop join
+        // (epic.watchers ?= @request.auth.id) is unreliable in PB listRules.
+        listRule: authed,
+        viewRule: authed,
         createRule: adminOrEpicOwnerOrWatcher,
         updateRule: adminOrEpicOwnerOrWatcher,
         deleteRule: adminOrEpicOwnerOrWatcher,

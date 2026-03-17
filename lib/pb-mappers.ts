@@ -96,12 +96,7 @@ export function mapTask(
     status: (r.status ?? "To Do") as TaskStatus,
     priority: (r.priority ?? "Medium") as Priority,
     dueDate: r.due_date ? r.due_date.split(" ")[0] : "",
-    // Prefer explicit start_date field; fall back to created timestamp
-    startDate: r.start_date
-      ? r.start_date.split(" ")[0]
-      : r.created
-        ? r.created.split(" ")[0]
-        : undefined,
+    startDate: r.start_date ? r.start_date.split(" ")[0] : undefined,
     estimate: r.estimate ?? undefined,
     order: r.order ?? 0,
     owner: r.expand?.owner ? mapUser(r.expand.owner) : undefined,

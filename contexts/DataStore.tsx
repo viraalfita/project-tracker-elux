@@ -188,51 +188,61 @@ export function DataStoreProvider({ children }: { children: ReactNode }) {
       }
 
       try {
-        const [
-          pbUsers,
-          pbEpics,
-          pbTasks,
-          pbGoals,
-          pbKpis,
-          pbSubtasks,
-          pbComments,
-          pbEpicDocs,
-        ] = await Promise.all([
+        // Stage 1: fetch users + epics first.
+        // Epics are already filtered by PB rules (owner/watcher) correctly.
+        // We then use the accessible epic IDs to explicitly filter tasks,
+        // bypassing the unreliable 2-hop join in PB task listRule.
+        const [pbUsers, pbEpics] = await Promise.all([
           pb.collection("users").getFullList<PBUser>(),
           pb.collection("epics").getFullList<PBEpic>({
             expand: "owner,watchers",
           }),
-          pb.collection("tasks").getFullList<PBTask>({
-            expand: "owner,assignee",
-          }),
-          pb.collection("goals").getFullList<PBGoal>({
-            expand: "owner,linked_epics",
-          }),
-          pb.collection("goal_kpis").getFullList<PBGoalKpi>(),
-          pb.collection("subtasks").getFullList<PBSubtask>({
-            expand: "assignee",
-          }),
-          pb.collection("comments").getFullList<PBComment>({
-            expand: "author,mentions",
-          }),
-          pb.collection("epic_docs").getFullList<PBEpicDoc>({
-            expand: "created_by",
-          }),
         ]);
+
+        // Stage 2: fetch remaining collections in parallel.
+        // IMPORTANT: tasks.listRule must be `@request.auth.id != ""` in PB
+        // admin UI so all epic members (watchers) can retrieve tasks.
+        // Until that rule is updated, client-side epic filtering below acts
+        // as a safety net but PB will still gatekeep watcher visibility.
+        const accessibleEpicIds = new Set(pbEpics.map((e) => e.id));
+
+        const [pbTasks, pbGoals, pbKpis, pbSubtasks, pbComments, pbEpicDocs] =
+          await Promise.all([
+            pb.collection("tasks").getFullList<PBTask>({
+              expand: "owner,assignee",
+            }),
+            pb.collection("goals").getFullList<PBGoal>({
+              expand: "owner,linked_epics",
+            }),
+            pb.collection("goal_kpis").getFullList<PBGoalKpi>(),
+            pb.collection("subtasks").getFullList<PBSubtask>({
+              expand: "assignee",
+            }),
+            pb.collection("comments").getFullList<PBComment>({
+              expand: "author,mentions",
+            }),
+            pb.collection("epic_docs").getFullList<PBEpicDoc>({
+              expand: "created_by",
+            }),
+          ]);
 
         setUsers(pbUsers.map(mapUser));
         setEpics(pbEpics.map(mapEpic));
         setEpicDocs(pbEpicDocs.map(mapEpicDoc));
 
-        const mappedTasks = pbTasks.map((t) => {
-          const subtasks = pbSubtasks
-            .filter((s) => s.task === t.id)
-            .map(mapSubtask);
-          const comments = pbComments
-            .filter((c) => c.task === t.id)
-            .map(mapComment);
-          return mapTask(t, subtasks, comments);
-        });
+        // Client-side cross-filter: only keep tasks that belong to epics the
+        // current user can actually access.
+        const mappedTasks = pbTasks
+          .filter((t) => accessibleEpicIds.has(t.epic))
+          .map((t) => {
+            const subtasks = pbSubtasks
+              .filter((s) => s.task === t.id)
+              .map(mapSubtask);
+            const comments = pbComments
+              .filter((c) => c.task === t.id)
+              .map(mapComment);
+            return mapTask(t, subtasks, comments);
+          });
         setTasks(mappedTasks);
 
         const mappedGoals = pbGoals.map((g) => {
